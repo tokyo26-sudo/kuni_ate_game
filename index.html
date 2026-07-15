@@ -62,6 +62,10 @@
   .brand { display:flex; align-items:baseline; gap:8px; margin-right:auto; }
   .brand .mark { color:var(--gold); font-weight:900; font-size:22px; letter-spacing:0.02em; }
   .brand .sub { color:var(--ink-dim); font-size:11px; letter-spacing:0.15em; }
+  #header-controls { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+  @media (max-width: 720px){
+    body.playing #header-controls { display:none; }
+  }
   #version-tag { color:var(--gold-dim); font-weight:700; background:var(--bg-panel-2);
     padding:2px 8px; border-radius:999px; border:1px solid var(--line); letter-spacing:0.05em; }
   #dobon-toggle-label, #bonus-toggle-label, #flagmode-toggle-label { font-size:13px; }
@@ -95,6 +99,20 @@
     z-index:9400; display:flex; gap:18px; align-items:center;
     background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
     padding:8px 20px; box-shadow:0 8px 22px rgba(0,0,0,0.25);
+    max-width:94vw;
+  }
+  @media (max-width: 720px){
+    #hud {
+      top:8px; padding:6px 10px; gap:10px; border-radius:10px;
+      max-width:96vw; flex-wrap:nowrap; overflow-x:auto;
+    }
+    #hud .stat .label { font-size:8px; }
+    #hud .stat .value { font-size:13px !important; }
+    #dobon-status-value, #bonus-status-value {
+      white-space:nowrap !important; overflow-x:auto; max-width:38vw;
+      font-size:10px !important; display:block;
+    }
+    #bonus-status { max-width:38vw !important; }
   }
 
   /* ---------- Answer panel ---------- */
@@ -271,49 +289,51 @@
     <div class="brand">
       <span class="mark">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.53</span>
+      <span class="sub mono" id="version-tag">v0.54</span>
     </div>
 
-    <select id="region-select">
-      <option value="all">全世界 (198)</option>
-    </select>
+    <div id="header-controls">
+      <select id="region-select">
+        <option value="all">全世界 (198)</option>
+      </select>
 
-    <select id="mode-select">
-      <option value="countdown">制限時間モード</option>
-      <option value="timeattack">タイムアタック</option>
-    </select>
+      <select id="mode-select">
+        <option value="countdown">制限時間モード</option>
+        <option value="timeattack">タイムアタック</option>
+      </select>
 
-    <select id="time-select">
-      <option value="60">1分</option>
-      <option value="180" selected>3分</option>
-      <option value="300">5分</option>
-    </select>
+      <select id="time-select">
+        <option value="60">1分</option>
+        <option value="180" selected>3分</option>
+        <option value="300">5分</option>
+      </select>
 
-    <label class="ctl" id="dobon-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-      <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
-      ドボンルール
-    </label>
-    <select id="dobon-mode-select" style="display:none;">
-      <option value="penalty" selected>減点</option>
-      <option value="out">アウト</option>
-    </select>
+      <label class="ctl" id="dobon-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
+        ドボンルール
+      </label>
+      <select id="dobon-mode-select" style="display:none;">
+        <option value="penalty" selected>減点</option>
+        <option value="out">アウト</option>
+      </select>
 
-    <label class="ctl" id="bonus-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-      <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
-      ボーナスルール
-    </label>
+      <label class="ctl" id="bonus-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
+        ボーナスルール
+      </label>
 
-    <label class="ctl" id="flagmode-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-      <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim); width:14px; height:14px;">
-      国旗表示モード
-    </label>
+      <label class="ctl" id="flagmode-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim); width:14px; height:14px;">
+        国旗表示モード
+      </label>
 
-    <button class="ctl" id="theme-toggle">🌙 ダーク</button>
-    <button class="ctl" id="giveup-btn" style="display:none; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
+      <button class="ctl" id="theme-toggle">🌙 ダーク</button>
+    </div>
     <button class="primary" id="start-btn">スタート</button>
   </header>
 
   <div id="map-wrap">
+    <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
     <div id="hud">
       <div class="stat" id="dobon-status" style="display:none;">
         <div class="label">ドボン</div>
@@ -898,6 +918,16 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(e.key === 'Escape') closePanel();
   });
 
+  // スマホの仮想キーボードは keydown が拾えないコトが多いダカラ、
+  // 入力欄にスペースが入った瞬間を検知してワープ扱いにするダカラ
+  answerInput.addEventListener('input', () => {
+    if(isComposing) return;
+    if(/[ \u3000]/.test(answerInput.value)){
+      answerInput.value = answerInput.value.replace(/[ \u3000]/g, '');
+      selectFeatureByKeyboard(findRandomFar());
+    }
+  });
+
   // ---------- キーボードでの国選択 ----------
   function candidateFeatures(excludeName){
     return COUNTRY_GEOJSON.features.filter(f =>
@@ -1331,6 +1361,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const reallyStart = () => {
       document.getElementById('map').classList.remove('map-hidden');
       document.getElementById('giveup-btn').style.display = '';
+      document.getElementById('hud').style.display = '';
+      document.body.classList.add('playing');
       state.running = true;
       state.reviewMode = false;
       startBtn.disabled = true;
@@ -1374,6 +1406,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('giveup-btn').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
     document.getElementById('bonus-status').style.display = 'none';
+    document.body.classList.remove('playing');
     if(state.timer) clearInterval(state.timer);
     closePanel();
     // 地図は隠さず、そのまま正解済みの国が見える状態で残す
@@ -1447,6 +1480,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   rpBackBtn.addEventListener('click', () => {
     resultPanel.classList.remove('show');
     document.getElementById('map').classList.add('map-hidden');
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('giveup-btn').style.display = 'none';
+    document.body.classList.remove('playing');
     overlay.classList.remove('hidden');
   });
   document.getElementById('giveup-btn').addEventListener('click', () => {

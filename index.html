@@ -307,7 +307,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.69</span>
+      <span class="sub mono" id="version-tag">v0.70</span>
     </div>
 
     <div id="header-controls">
@@ -352,6 +352,7 @@
 
   <div id="map-wrap">
     <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
+    <button class="ctl" id="vs-force-end-btn" style="display:none; position:absolute; top:16px; right:110px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">対戦を終了する</button>
     <div id="hud">
       <div class="stat" id="dobon-status" style="display:none;">
         <div class="label">ドボン</div>
@@ -428,6 +429,31 @@
       </div>
       <div id="vs-create-form" style="display:none; flex-direction:column; gap:10px; align-items:center;">
         <input id="vs-name-input-create" type="text" maxlength="12" placeholder="ニックネーム" style="width:160px; text-align:center; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg-deep); color:var(--ink);">
+        <div class="desc" style="margin-top:4px;">対戦のルール、ゲームマスター（部屋を作った人）が決めるダカラ</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:320px;">
+          <select id="vs-region-select"></select>
+          <select id="vs-mode-select">
+            <option value="countdown" selected>制限時間モード</option>
+            <option value="timeattack">タイムアタック(全部揃うまで)</option>
+          </select>
+          <select id="vs-time-select">
+            <option value="60">1分</option>
+            <option value="180" selected>3分</option>
+            <option value="300">5分</option>
+          </select>
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="vs-dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
+            ドボンルール
+          </label>
+          <select id="vs-dobon-mode-select" style="display:none;">
+            <option value="penalty" selected>減点</option>
+            <option value="out">アウト</option>
+          </select>
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="vs-bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
+            ボーナスルール
+          </label>
+        </div>
         <button class="primary" id="vs-create-confirm-btn">部屋を作成</button>
       </div>
       <div class="desc" id="vs-lobby-status"></div>
@@ -436,6 +462,7 @@
     <div id="vs-room-overlay">
       <h1>対戦ルーム <span id="vs-room-code-display" class="mono"></span></h1>
       <div class="desc">このコードを相手に伝えてクダサイ。対戦者は2人まで、それ以降は観戦者ダカラ。</div>
+      <div class="desc" id="vs-settings-summary" style="font-weight:600;"></div>
       <div id="vs-player-list"></div>
       <div class="overlay-controls">
         <button class="primary" id="vs-start-btn" style="display:none;">対戦スタート</button>
@@ -572,6 +599,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       regionSelect.appendChild(opt);
     }
   });
+  document.getElementById('vs-region-select').innerHTML = regionSelect.innerHTML;
 
   function isOutOfRegion(feature){
     return state.region !== "all" && feature.properties.region_ja !== state.region;
@@ -1446,6 +1474,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.reviewMode = true;
     startBtn.disabled = false;
     document.getElementById('giveup-btn').style.display = 'none';
+    document.getElementById('vs-force-end-btn').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
     document.getElementById('bonus-status').style.display = 'none';
     document.body.classList.remove('playing');
@@ -1514,6 +1543,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     regionFilter: "all",
     dobonClaimedPlayerId: null,
     pollTimer: null,
+    roomSettings: null,
+    countdownScheduled: false,
   };
 
   const PLAYER_COLORS = ["#e8a33d", "#4a90d9", "#9b6bd1", "#5cbf6a", "#e05c5c", "#5cc9c9"];
@@ -1552,6 +1583,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
+    document.getElementById('vs-force-end-btn').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
     document.getElementById('bonus-status').style.display = 'none';
     document.body.classList.remove('playing');
@@ -1593,14 +1625,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsSetStatus('部屋を作成中ダカラ...');
     const code = genRoomCode();
     const settings = {
-      mode: document.getElementById('mode-select').value,
-      region: document.getElementById('region-select').value,
-      timeLimit: parseInt(document.getElementById('time-select').value, 10),
+      mode: document.getElementById('vs-mode-select').value,
+      region: document.getElementById('vs-region-select').value,
+      timeLimit: parseInt(document.getElementById('vs-time-select').value, 10),
     };
     // ドボン・ボーナスも、対戦の２人に同じ内容が伝わるよう、部屋を作る時に先に決めておくダカラ
-    settings.dobonEnabled = document.getElementById('dobon-toggle').checked;
-    settings.dobonMode = document.getElementById('dobon-mode-select').value;
-    settings.bonusEnabled = document.getElementById('bonus-toggle').checked;
+    settings.dobonEnabled = document.getElementById('vs-dobon-toggle').checked;
+    settings.dobonMode = document.getElementById('vs-dobon-mode-select').value;
+    settings.bonusEnabled = document.getElementById('vs-bonus-toggle').checked;
     settings.dobonCountry = null;
     settings.bonusCountries = [];
     if(settings.dobonEnabled){
@@ -1623,6 +1655,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       if(error) throw error;
       vsState.roomId = room.id;
       vsState.roomCode = room.code;
+      vsState.roomSettings = room.settings;
       await vsJoinAsPlayer(name);
     } catch(err){
       vsSetStatus('作成失敗ダカラ: ' + (err.message || err));
@@ -1640,6 +1673,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       if(error || !room) throw new Error('その部屋番号は見つからないダカラ');
       vsState.roomId = room.id;
       vsState.roomCode = room.code;
+      vsState.roomSettings = room.settings;
       await vsJoinAsPlayer(name);
     } catch(err){
       vsSetStatus(err.message || String(err));
@@ -1674,6 +1708,24 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsStartPolling();
   }
 
+  function vsIsHost(){
+    const players = vsState.players.filter(p => p.role === 'player');
+    return players.length > 0 && players[0].id === vsState.myPlayerId;
+  }
+
+  function vsRenderSettingsSummary(){
+    const el = document.getElementById('vs-settings-summary');
+    if(!el) return;
+    const s = vsState.roomSettings;
+    if(!s){ el.textContent = ''; return; }
+    const modeLabel = s.mode === 'timeattack' ? 'タイムアタック(全部揃うまで終了ダカラ)' : '制限時間モード';
+    const regionLabel = (s.region === 'all' || !s.region) ? '全世界' : s.region;
+    const timeLabel = s.mode === 'timeattack' ? '' : (' ・ ' + Math.round((s.timeLimit || 180) / 60) + '分');
+    const dobonLabel = s.dobonEnabled ? (' ・ ドボン:' + (s.dobonMode === 'out' ? 'アウト' : '減点')) : '';
+    const bonusLabel = s.bonusEnabled ? ' ・ ボーナスあり' : '';
+    el.textContent = 'ルール：' + regionLabel + ' ・ ' + modeLabel + timeLabel + dobonLabel + bonusLabel;
+  }
+
   async function vsRefreshPlayerList(){
     const { data: players } = await sb.from('players').select().eq('room_id', vsState.roomId).order('joined_at');
     vsState.players = players || [];
@@ -1684,7 +1736,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }).join('');
     const startBtn = document.getElementById('vs-start-btn');
     const playerCount = vsState.players.filter(p => p.role === 'player').length;
-    startBtn.style.display = (vsState.myRole === 'player' && playerCount >= 2 && !vsState.playing) ? '' : 'none';
+    startBtn.style.display = (vsIsHost() && playerCount >= 2 && !vsState.playing) ? '' : 'none';
+    vsRenderSettingsSummary();
   }
 
   function vsSubscribeRoom(){
@@ -1720,16 +1773,62 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
 
   function vsHandleRoomUpdate(room){
-    if(room.status === 'playing' && !vsState.playing){
-      vsStartMatch(room.settings);
+    if(room.status === 'playing' && !vsState.playing && !vsState.countdownScheduled){
+      vsState.roomSettings = room.settings;
+      const startAt = (room.settings && room.settings.startAt) || Date.now();
+      const delay = startAt - Date.now();
+      if(delay > 200){
+        vsState.countdownScheduled = true;
+        vsShowStartCountdown(delay, () => {
+          vsState.countdownScheduled = false;
+          vsStartMatch(room.settings);
+        });
+      } else {
+        vsStartMatch(room.settings);
+      }
     } else if(room.status === 'finished' && vsState.playing){
       vsFinishMatch();
     }
   }
 
-  document.getElementById('vs-start-btn').addEventListener('click', async () => {
-    await sb.from('rooms').update({ status: 'playing' }).eq('id', vsState.roomId);
+  document.getElementById('vs-force-end-btn').addEventListener('click', async () => {
+    if(!vsIsHost()) return;
+    await sb.from('rooms').update({ status: 'finished' }).eq('id', vsState.roomId);
+    vsFinishMatch();
   });
+
+  document.getElementById('vs-start-btn').addEventListener('click', async () => {
+    if(!vsIsHost()) return;
+    const startAt = Date.now() + 3200;
+    const newSettings = Object.assign({}, vsState.roomSettings, { startAt });
+    vsState.roomSettings = newSettings;
+    await sb.from('rooms').update({ status: 'playing', settings: newSettings }).eq('id', vsState.roomId);
+  });
+
+  // 部屋のステータスが'playing'になったのを見ても、すぐ試合を始めないダカラ
+  // startAtの時刻まで3-2-1のカウントダウンを見せてから、両方の画面で揃えて開始するヨ
+  function vsShowStartCountdown(delay, onDone){
+    let overlay = document.getElementById('vs-countdown-overlay');
+    if(!overlay){
+      overlay = document.createElement('div');
+      overlay.id = 'vs-countdown-overlay';
+      overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); color:#fff; font-size:88px; font-weight:800; font-family:inherit;';
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    const endAt = Date.now() + delay;
+    const step = () => {
+      const remain = endAt - Date.now();
+      if(remain <= 0){
+        overlay.style.display = 'none';
+        onDone();
+        return;
+      }
+      overlay.textContent = String(Math.ceil(remain / 1000));
+      setTimeout(step, 100);
+    };
+    step();
+  }
 
   function vsPlayerColor(playerId){
     const p = vsState.players.find(p => p.id === playerId);
@@ -1751,8 +1850,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         } else {
           showToast("エラーダカラ: " + error.message, true);
         }
+      } else {
+        // 自分の分は、Realtime通知を待たずにここで先に反映しちゃうダカラ
+        vsHandleClaim({ country_name: feature.properties.name_ja, player_id: vsState.myPlayerId });
       }
-      // 成功した場合はRealtimeのINSERTイベント(vsHandleClaim)が全員に飛んでくるダカラ、ここでは何もしないネ
     } catch(err){
       showToast("通信エラーダカラ", true);
     }
@@ -1901,6 +2002,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.remove('map-hidden');
     document.getElementById('hud').style.display = '';
     document.body.classList.add('playing');
+    document.getElementById('vs-force-end-btn').style.display = vsIsHost() ? '' : 'none';
     showOverlayById(null);
     map.setView([20,160], 2);
     setTimeout(updateSmallMarkers, 200);
@@ -1931,6 +2033,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.running = false;
     state.vsMode = false;
     document.body.classList.remove('playing');
+    document.getElementById('vs-force-end-btn').style.display = 'none';
     const counts = {};
     COUNTRY_GEOJSON.features.forEach(f => {
       if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
@@ -1965,6 +2068,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   document.getElementById('dobon-toggle').addEventListener('change', e => {
     document.getElementById('dobon-mode-select').style.display = e.target.checked ? '' : 'none';
   });
+  document.getElementById('vs-dobon-toggle').addEventListener('change', e => {
+    document.getElementById('vs-dobon-mode-select').style.display = e.target.checked ? '' : 'none';
+  });
 
   startBtn.addEventListener('click', () => {
     if(state.running) return;
@@ -1977,6 +2083,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
+    document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
     overlay.classList.remove('hidden');
   });

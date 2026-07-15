@@ -307,7 +307,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.68</span>
+      <span class="sub mono" id="version-tag">v0.69</span>
     </div>
 
     <div id="header-controls">
@@ -1513,6 +1513,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     playing: false,
     regionFilter: "all",
     dobonClaimedPlayerId: null,
+    pollTimer: null,
   };
 
   const PLAYER_COLORS = ["#e8a33d", "#4a90d9", "#9b6bd1", "#5cbf6a", "#e05c5c", "#5cc9c9"];
@@ -1556,6 +1557,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.body.classList.remove('playing');
     resultPanel.classList.remove('show');
     if(vsState.channel && sb){ sb.removeChannel(vsState.channel); vsState.channel = null; }
+    vsStopPolling();
     vsState.roomId = null;
     scoreDisplay.textContent = "0 / 0";
     pointsDisplay.textContent = "0";
@@ -1669,6 +1671,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     showOverlayById('vs-room-overlay');
     vsSubscribeRoom();
     vsRefreshPlayerList();
+    vsStartPolling();
   }
 
   async function vsRefreshPlayerList(){
@@ -1691,6 +1694,29 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'claims', filter:'room_id=eq.' + vsState.roomId }, payload => vsHandleClaim(payload.new))
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'rooms', filter:'id=eq.' + vsState.roomId }, payload => vsHandleRoomUpdate(payload.new))
       .subscribe();
+  }
+
+  // リアルタイム通知、環境によっては届かないことがあるダカラ、保険で定期的にDBを見に行くヨ
+  // （相手の入室・試合開始・試合終了に片方だけ気づけない、っていう不具合の対策ダカラ）
+  function vsStartPolling(){
+    vsStopPolling();
+    vsState.pollTimer = setInterval(async () => {
+      if(!vsState.roomId || !sb) return;
+      try {
+        const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
+        if(room) vsHandleRoomUpdate(room);
+        if(!vsState.playing){
+          await vsRefreshPlayerList();
+        } else {
+          const { data: claims } = await sb.from('claims').select().eq('room_id', vsState.roomId);
+          (claims || []).forEach(vsHandleClaim);
+        }
+      } catch(err){ /* 通信失敗した時は、次のポーリングに任せるダカラ */ }
+    }, 2500);
+  }
+
+  function vsStopPolling(){
+    if(vsState.pollTimer){ clearInterval(vsState.pollTimer); vsState.pollTimer = null; }
   }
 
   function vsHandleRoomUpdate(room){
@@ -1735,6 +1761,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function vsHandleClaim(claim){
     const feature = COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === claim.country_name);
     if(!feature) return;
+    // 既に同じ国が同じ人の物として処理済みだったら、二重処理しないダカラ
+    // （リアルタイム通知とポーリングが両方届いた時の重複防止ネ）
+    if(feature.properties.__claimedBy === claim.player_id) return;
     feature.properties.__correct = true;
     feature.properties.__claimedBy = claim.player_id;
     const layer = layers[claim.country_name];
@@ -1922,11 +1951,13 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   document.getElementById('vs-join-btn').addEventListener('click', vsJoinRoom);
   document.getElementById('vs-leave-btn').addEventListener('click', () => {
     if(vsState.channel && sb) sb.removeChannel(vsState.channel);
+    vsStopPolling();
     vsState.roomId = null;
     showOverlayById('overlay');
   });
   document.getElementById('vs-result-back-btn').addEventListener('click', () => {
     if(vsState.channel && sb) sb.removeChannel(vsState.channel);
+    vsStopPolling();
     vsState.roomId = null;
     showOverlayById('overlay');
   });

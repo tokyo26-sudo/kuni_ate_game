@@ -271,7 +271,7 @@
     <div class="brand">
       <span class="mark">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.51</span>
+      <span class="sub mono" id="version-tag">v0.53</span>
     </div>
 
     <select id="region-select">
@@ -1138,7 +1138,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         tt.on('click', e => {
           L.DomEvent.stopPropagation(e);
           const target = smallMarkers[name] || layers[name];
-          if(target) onCountryClick(f, target);
+          if(target) handleMapClick(f, target);
         });
         hintTooltips[name] = tt;
       }
@@ -1424,6 +1424,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(vsState.channel) sb.removeChannel(vsState.channel);
     vsState.roomId = null;
     showOverlayById('overlay');
+  });
+
+  document.getElementById('vs-open-btn').addEventListener('click', () => {
+    showOverlayById('vs-lobby-overlay');
+    document.getElementById('vs-lobby-status').textContent = '';
+    document.getElementById('vs-join-form').style.display = 'none';
+    document.getElementById('vs-create-form').style.display = 'none';
+    document.getElementById('vs-lobby-choice').style.display = 'flex';
   });
 
   document.getElementById('dobon-toggle').addEventListener('change', e => {

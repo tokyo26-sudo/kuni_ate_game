@@ -307,7 +307,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.66</span>
+      <span class="sub mono" id="version-tag">v0.68</span>
     </div>
 
     <div id="header-controls">
@@ -1229,7 +1229,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     Object.keys(hintTooltips).forEach(name => { map.removeLayer(hintTooltips[name]); delete hintTooltips[name]; });
   }
 
-  function pickBonusSet(excludeFeature){
+  function pickBonusSet(excludeFeature, regionOverride){
+    const region = regionOverride || state.region;
     const types = Object.keys(HINT_LABELS).sort(() => Math.random() - 0.5);
     const used = new Set([excludeFeature]);
     const results = [];
@@ -1237,7 +1238,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const criterion = Math.random() < 0.5 ? 'area' : 'population';
       const valueField = criterion === 'area' ? 'area_km2' : 'population';
       const pool = COUNTRY_GEOJSON.features.filter(f =>
-        (state.region === "all" || f.properties.region_ja === state.region) &&
+        (region === "all" || f.properties.region_ja === region) &&
         f.properties[valueField] != null &&
         !used.has(f)
       );
@@ -1253,11 +1254,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     return results;
   }
 
-  function pickDobonFeature(){
+  function pickDobonFeature(regionOverride){
+    const region = regionOverride || state.region;
     const criterion = Math.random() < 0.5 ? 'area' : 'population';
     const valueField = criterion === 'area' ? 'area_km2' : 'population';
     const pool = COUNTRY_GEOJSON.features.filter(f =>
-      (state.region === "all" || f.properties.region_ja === state.region) &&
+      (region === "all" || f.properties.region_ja === region) &&
       f.properties[valueField] != null
     );
     if(!pool.length) return null;
@@ -1510,6 +1512,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     channel: null,
     playing: false,
     regionFilter: "all",
+    dobonClaimedPlayerId: null,
   };
 
   const PLAYER_COLORS = ["#e8a33d", "#4a90d9", "#9b6bd1", "#5cbf6a", "#e05c5c", "#5cc9c9"];
@@ -1592,6 +1595,27 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       region: document.getElementById('region-select').value,
       timeLimit: parseInt(document.getElementById('time-select').value, 10),
     };
+    // ドボン・ボーナスも、対戦の２人に同じ内容が伝わるよう、部屋を作る時に先に決めておくダカラ
+    settings.dobonEnabled = document.getElementById('dobon-toggle').checked;
+    settings.dobonMode = document.getElementById('dobon-mode-select').value;
+    settings.bonusEnabled = document.getElementById('bonus-toggle').checked;
+    settings.dobonCountry = null;
+    settings.bonusCountries = [];
+    if(settings.dobonEnabled){
+      const picked = pickDobonFeature(settings.region);
+      if(picked){
+        settings.dobonCountry = picked.feature.properties.name_ja;
+        settings.dobonCriterion = picked.criterion;
+        settings.dobonRank = picked.rank;
+      }
+    }
+    if(settings.bonusEnabled){
+      const excludeFeature = settings.dobonCountry
+        ? COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === settings.dobonCountry)
+        : null;
+      const picked = pickBonusSet(excludeFeature, settings.region);
+      settings.bonusCountries = picked.map(r => ({ type: r.type, name: r.feature.properties.name_ja, criterion: r.criterion, rank: r.rank }));
+    }
     try {
       const { data: room, error } = await sb.from('rooms').insert({ code, settings }).select().single();
       if(error) throw error;
@@ -1721,9 +1745,24 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(marker) marker.setStyle({ ...style, radius: 6, weight: 1.5 });
     const flag = flagEmoji(feature.properties.cca2);
     bindCountryTooltip(feature, marker || layer, flag + " " + claim.country_name, 'correct-tip', marker ? 'top' : 'center', marker ? [0,-6] : [0,0]);
+
+    // ドボン国だったら、取ったプレイヤーだけ減点対象にするダカラ
+    const isDobon = state.dobonEnabled && state.dobonFeature === feature;
+    if(isDobon) vsState.dobonClaimedPlayerId = claim.player_id;
+
+    // ボーナス国だったら、取った本人の画面だけヒントが出るヨ（相手には見えないダカラ）
+    const bonusEntry = state.bonusEnabled ? state.bonusSet.find(b => b.feature === feature) : null;
+
     vsUpdateScoreboard();
     if(claim.player_id === vsState.myPlayerId){
-      showToast(flag + " " + claim.country_name + " ゲットダカラ！");
+      if(isDobon){
+        showToast(flag + " " + claim.country_name + " ドボンだったダカラ！自分のスコアが1マイナスになるヨ");
+      } else if(bonusEntry){
+        activateHint(bonusEntry.type);
+        showToast(flag + " " + claim.country_name + " ボーナスだったダカラ！" + HINT_LABELS[bonusEntry.type] + "ヒント、自分にだけ発動するヨ");
+      } else {
+        showToast(flag + " " + claim.country_name + " ゲットダカラ！");
+      }
     }
     vsCheckAllClaimed();
   }
@@ -1733,6 +1772,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     COUNTRY_GEOJSON.features.forEach(f => {
       if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
     });
+    // ドボン国を取っちゃったプレイヤーは、ここで1マイナスされるダカラ
+    if(state.dobonEnabled && vsState.dobonClaimedPlayerId){
+      const pid = vsState.dobonClaimedPlayerId;
+      counts[pid] = (counts[pid] || 0) - 1;
+    }
     const players = vsState.players.filter(p => p.role === 'player');
     document.getElementById('bonus-status').style.display = 'none';
     document.getElementById('dobon-status').style.display = '';
@@ -1753,6 +1797,45 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
   }
 
+  // 対戦開始のタイミングで、ドボン・ボーナスの手がかり（ランキングだけ、国名は隠したまま）を
+  // シングルプレイのルーレット演出と同じ見た目で出すダカラ。両方の画面で同じ内容が出るヨ
+  function vsRevealDobonAndBonus(){
+    const scope = rankScopeLabel();
+
+    const showBonus = () => {
+      if(!state.bonusEnabled || !state.bonusSet.length) return;
+      const bonusOverlay = document.getElementById('bonus-overlay');
+      const bonusSpin = document.getElementById('bonus-spin');
+      const bonusList = document.getElementById('bonus-list');
+      const bonusOk = document.getElementById('bonus-ok-btn');
+      bonusSpin.classList.remove('spinning');
+      bonusSpin.textContent = "決定ダカラ！";
+      bonusList.innerHTML = state.bonusSet.map(r => {
+        const label = r.criterion === 'area' ? '面積' : '人口';
+        return '<div class="bonus-row"><b>' + label + scope + r.rank + '位</b> → ' + HINT_LABELS[r.type] + 'ヒント</div>';
+      }).join('');
+      bonusOk.style.display = '';
+      bonusOverlay.classList.add('show');
+      bonusOk.onclick = () => { bonusOverlay.classList.remove('show'); };
+    };
+
+    if(state.dobonEnabled && state.dobonFeature && state.dobonRank){
+      const dobonOverlay = document.getElementById('dobon-overlay');
+      const dobonSpin = document.getElementById('dobon-spin');
+      const dobonDesc = document.getElementById('dobon-desc');
+      const dobonOk = document.getElementById('dobon-ok-btn');
+      const label = state.dobonCriterion === 'area' ? '面積' : '人口';
+      dobonSpin.classList.remove('spinning');
+      dobonSpin.textContent = label + " " + scope + state.dobonRank + "位";
+      dobonDesc.textContent = "「" + label + " " + scope + state.dobonRank + "位」の国はドボンダカラ！取っちゃうと、自分のスコアだけ1マイナスになるヨ。";
+      dobonOk.style.display = '';
+      dobonOverlay.classList.add('show');
+      dobonOk.onclick = () => { dobonOverlay.classList.remove('show'); showBonus(); };
+    } else {
+      showBonus();
+    }
+  }
+
   function vsStartMatch(settings){
     vsState.playing = true;
     vsState.regionFilter = settings.region || "all";
@@ -1761,6 +1844,26 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.region = settings.region || "all";
     state.mode = settings.mode || "countdown";
     state.timeLimit = settings.timeLimit || 180;
+
+    // ドボン・ボーナス、部屋作成時に決めた同じ内容を、こっち側でも組み立て直すダカラ
+    state.dobonEnabled = !!settings.dobonEnabled;
+    state.dobonMode = settings.dobonMode || 'penalty';
+    state.dobonFeature = settings.dobonCountry
+      ? COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === settings.dobonCountry) || null
+      : null;
+    state.dobonCriterion = settings.dobonCriterion || 'area';
+    state.dobonRank = settings.dobonRank || null;
+    state.bonusEnabled = !!settings.bonusEnabled;
+    state.bonusSet = (settings.bonusCountries || [])
+      .map(bc => ({
+        type: bc.type,
+        criterion: bc.criterion,
+        rank: bc.rank,
+        feature: COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === bc.name),
+      }))
+      .filter(b => b.feature);
+    vsState.dobonClaimedPlayerId = null;
+
     state.timeLeft = state.timeLimit;
     state.elapsed = 0;
     state.running = true;
@@ -1773,6 +1876,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     map.setView([20,160], 2);
     setTimeout(updateSmallMarkers, 200);
     vsUpdateScoreboard();
+    vsRevealDobonAndBonus();
 
     timeDisplay.classList.remove('warn');
     timeDisplay.textContent = state.mode === "countdown" ? fmtTime(state.timeLeft) : "00:00";

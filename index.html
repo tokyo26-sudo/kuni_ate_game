@@ -176,6 +176,7 @@
     position:absolute; inset:0; background:var(--overlay-bg);
     display:flex; align-items:center; justify-content:center; z-index:9000;
     flex-direction:column; gap:20px; padding:20px; text-align:center;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
   #overlay.hidden { display:none; }
   #overlay h1 { font-size:15px; letter-spacing:0.25em; color:var(--gold); margin:0; font-weight:700; }
@@ -187,6 +188,7 @@
     position:absolute; inset:0; background:var(--overlay-bg);
     display:none; align-items:center; justify-content:center; z-index:9600;
     flex-direction:column; gap:20px; padding:20px; text-align:center;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
   #dobon-overlay.show { display:flex; }
   #dobon-overlay h1 { font-size:15px; letter-spacing:0.25em; color:var(--red); margin:0; font-weight:700; }
@@ -202,6 +204,7 @@
     position:absolute; inset:0; background:var(--overlay-bg);
     display:none; align-items:center; justify-content:center; z-index:9600;
     flex-direction:column; gap:16px; padding:20px; text-align:center;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
   #bonus-overlay.show { display:flex; }
   #bonus-overlay h1 { font-size:15px; letter-spacing:0.25em; color:var(--teal); margin:0; font-weight:700; }
@@ -220,6 +223,7 @@
     position:absolute; inset:0; background:var(--overlay-bg);
     display:none; align-items:center; justify-content:center; z-index:9600;
     flex-direction:column; gap:18px; padding:20px; text-align:center;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
   #vs-lobby-overlay.show, #vs-room-overlay.show, #vs-result-overlay.show { display:flex; }
   #vs-lobby-overlay h1, #vs-room-overlay h1, #vs-result-overlay h1 {
@@ -289,7 +293,7 @@
     <div class="brand">
       <span class="mark">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.57</span>
+      <span class="sub mono" id="version-tag">v0.59</span>
     </div>
 
     <div id="header-controls">
@@ -513,6 +517,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     flagMode: false,
     points: 0,
     answeredFeatures: [],
+    vsMode: false,
     dobonPointsEarned: 0,
   };
 
@@ -844,6 +849,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const answers = answerSet(feature.properties);
 
     if(answers.has(val)){
+      if(state.vsMode){
+        vsSubmitClaim(feature);
+        return;
+      }
       feature.properties.__correct = true;
       refreshAllStyles();
       const flag = flagEmoji(feature.properties.cca2);
@@ -1615,6 +1624,28 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     return p && p.color ? p.color : '#888';
   }
 
+  async function vsSubmitClaim(feature){
+    closePanel();
+    if(!sb || !vsState.roomId || !vsState.myPlayerId) return;
+    try {
+      const { error } = await sb.from('claims').insert({
+        room_id: vsState.roomId,
+        country_name: feature.properties.name_ja,
+        player_id: vsState.myPlayerId,
+      });
+      if(error){
+        if(error.code === '23505'){
+          showToast(feature.properties.name_ja + " はもう取られちゃったダカラ！", true);
+        } else {
+          showToast("エラーダカラ: " + error.message, true);
+        }
+      }
+      // 成功した場合はRealtimeのINSERTイベント(vsHandleClaim)が全員に飛んでくるダカラ、ここでは何もしないネ
+    } catch(err){
+      showToast("通信エラーダカラ", true);
+    }
+  }
+
   function vsHandleClaim(claim){
     const feature = COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === claim.country_name);
     if(!feature) return;
@@ -1666,6 +1697,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resetLayers();
     COUNTRY_GEOJSON.features.forEach(f => { delete f.properties.__claimedBy; });
     state.region = settings.region || "all";
+    state.running = true;
+    state.vsMode = true;
+    state.reviewMode = false;
     document.getElementById('map').classList.remove('map-hidden');
     document.getElementById('hud').style.display = '';
     document.body.classList.add('playing');
@@ -1677,6 +1711,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function vsFinishMatch(){
     vsState.playing = false;
+    state.running = false;
+    state.vsMode = false;
     document.body.classList.remove('playing');
     const counts = {};
     COUNTRY_GEOJSON.features.forEach(f => {

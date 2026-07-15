@@ -132,10 +132,17 @@
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) translateY(96px) scale(0.94);
     background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
     padding:14px 16px; display:flex; gap:10px; align-items:center;
-    box-shadow:0 20px 50px rgba(0,0,0,0.55); transition:transform .18s ease, opacity .18s ease;
+    box-shadow:0 20px 50px rgba(0,0,0,0.55); transition:transform .18s ease, opacity .18s ease, bottom .15s ease;
     z-index:9999; min-width:320px; opacity:0; pointer-events:none;
   }
   #answer-panel.show { transform:translate(-50%,-50%) translateY(96px) scale(1); opacity:1; pointer-events:auto; }
+  @media (max-width: 720px){
+    #answer-panel {
+      position:fixed; left:50%; top:auto; bottom:12px;
+      transform:translate(-50%,0) scale(0.94); min-width:0; width:92vw;
+    }
+    #answer-panel.show { transform:translate(-50%,0) scale(1); }
+  }
   #answer-panel .region-tag {
     font-size:11px; color:var(--ink-dim); position:absolute; top:-22px; left:16px;
     letter-spacing:0.08em;
@@ -303,9 +310,9 @@
 <div id="app">
   <header>
     <div class="brand">
-      <span class="mark">世界の国名当てゲーム</span>
+      <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.62</span>
+      <span class="sub mono" id="version-tag">v0.64</span>
     </div>
 
     <div id="header-controls">
@@ -1516,6 +1523,37 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const el = document.getElementById('vs-lobby-status');
     if(el) el.textContent = msg;
   }
+
+  document.getElementById('logo-reset').addEventListener('click', () => {
+    if(state.timer){ clearInterval(state.timer); state.timer = null; }
+    state.running = false;
+    state.reviewMode = false;
+    state.vsMode = false;
+    activeHintTypes = new Set();
+    clearAllHints();
+    Object.keys(manualTooltips).forEach(name => { map.removeLayer(manualTooltips[name]); delete manualTooltips[name]; });
+    COUNTRY_GEOJSON.features.forEach(f => {
+      f.properties.__correct = false;
+      delete f.properties.__claimedBy;
+      const layer = layers[f.properties.name_ja];
+      if(layer){ layer.setStyle(styleFor(f, false)); layer.unbindTooltip(); }
+      const marker = smallMarkers[f.properties.name_ja];
+      if(marker){ marker.setStyle(markerStyleFor(f, false)); marker.unbindTooltip(); }
+    });
+    document.getElementById('map').classList.add('map-hidden');
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('giveup-btn').style.display = 'none';
+    document.getElementById('dobon-status').style.display = 'none';
+    document.getElementById('bonus-status').style.display = 'none';
+    document.body.classList.remove('playing');
+    resultPanel.classList.remove('show');
+    if(vsState.channel && sb){ sb.removeChannel(vsState.channel); vsState.channel = null; }
+    vsState.roomId = null;
+    scoreDisplay.textContent = "0 / 0";
+    pointsDisplay.textContent = "0";
+    timeDisplay.textContent = "--:--";
+    showOverlayById('overlay');
+  });
 
   document.getElementById('vs-open-btn').addEventListener('click', () => {
     if(!sb){ vsSetStatus('Supabaseの読み込みに失敗してるダカラ、通信環境を確認してクダサイ'); }

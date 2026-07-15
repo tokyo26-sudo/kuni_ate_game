@@ -289,7 +289,7 @@
     <div class="brand">
       <span class="mark">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.56</span>
+      <span class="sub mono" id="version-tag">v0.57</span>
     </div>
 
     <div id="header-controls">
@@ -1453,18 +1453,258 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   syncTimeSelectVisibility();
   modeSelectEl.addEventListener('change', syncTimeSelectVisibility);
 
-  document.getElementById('vs-result-back-btn').addEventListener('click', () => {
-    if(vsState.channel) sb.removeChannel(vsState.channel);
-    vsState.roomId = null;
-    showOverlayById('overlay');
-  });
+  // ---------- 対戦モード(Supabase Realtime) ----------
+  const SUPABASE_URL = "https://acytuhewfhuoxugwmbat.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_ruAGcA3YSvXXCPkc3s6aTQ_4lg3wAYJ";
+  const sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  const vsState = {
+    roomId: null,
+    roomCode: null,
+    myPlayerId: null,
+    myRole: null,
+    myName: null,
+    players: [],
+    channel: null,
+    playing: false,
+    regionFilter: "all",
+  };
+
+  const PLAYER_COLORS = ["#e8a33d", "#4a90d9", "#9b6bd1", "#5cbf6a", "#e05c5c", "#5cc9c9"];
+  function vsColorFor(idx){ return PLAYER_COLORS[idx % PLAYER_COLORS.length]; }
+
+  function showOverlayById(id){
+    ["overlay","vs-lobby-overlay","vs-room-overlay","vs-result-overlay","dobon-overlay","bonus-overlay"].forEach(o => {
+      const el = document.getElementById(o);
+      if(!el) return;
+      el.classList.toggle('show', o === id);
+      if(o === 'overlay'){ el.classList.toggle('hidden', id !== 'overlay'); }
+    });
+  }
+
+  function vsSetStatus(msg){
+    const el = document.getElementById('vs-lobby-status');
+    if(el) el.textContent = msg;
+  }
 
   document.getElementById('vs-open-btn').addEventListener('click', () => {
+    if(!sb){ vsSetStatus('Supabaseの読み込みに失敗してるダカラ、通信環境を確認してクダサイ'); }
     showOverlayById('vs-lobby-overlay');
-    document.getElementById('vs-lobby-status').textContent = '';
+    vsSetStatus('');
     document.getElementById('vs-join-form').style.display = 'none';
     document.getElementById('vs-create-form').style.display = 'none';
     document.getElementById('vs-lobby-choice').style.display = 'flex';
+  });
+  document.getElementById('vs-lobby-close-btn').addEventListener('click', () => showOverlayById('overlay'));
+  document.getElementById('vs-create-btn').addEventListener('click', () => {
+    document.getElementById('vs-lobby-choice').style.display = 'none';
+    document.getElementById('vs-create-form').style.display = 'flex';
+  });
+  document.getElementById('vs-join-toggle-btn').addEventListener('click', () => {
+    document.getElementById('vs-lobby-choice').style.display = 'none';
+    document.getElementById('vs-join-form').style.display = 'flex';
+  });
+
+  function genRoomCode(){
+    return String(Math.floor(1000 + Math.random() * 9000));
+  }
+
+  async function vsCreateRoom(){
+    if(!sb){ vsSetStatus('Supabase未接続ダカラ、部屋を作れないヨ'); return; }
+    const name = document.getElementById('vs-name-input-create').value.trim() || 'プレイヤー';
+    vsSetStatus('部屋を作成中ダカラ...');
+    const code = genRoomCode();
+    const settings = {
+      mode: document.getElementById('mode-select').value,
+      region: document.getElementById('region-select').value,
+      timeLimit: parseInt(document.getElementById('time-select').value, 10),
+    };
+    try {
+      const { data: room, error } = await sb.from('rooms').insert({ code, settings }).select().single();
+      if(error) throw error;
+      vsState.roomId = room.id;
+      vsState.roomCode = room.code;
+      await vsJoinAsPlayer(name);
+    } catch(err){
+      vsSetStatus('作成失敗ダカラ: ' + (err.message || err));
+    }
+  }
+
+  async function vsJoinRoom(){
+    if(!sb){ vsSetStatus('Supabase未接続ダカラ、参加できないヨ'); return; }
+    const code = document.getElementById('vs-code-input').value.trim();
+    const name = document.getElementById('vs-name-input-join').value.trim() || 'プレイヤー';
+    if(!/^\d{4}$/.test(code)){ vsSetStatus('4桁の数字を入力してクダサイ'); return; }
+    vsSetStatus('入室中ダカラ...');
+    try {
+      const { data: room, error } = await sb.from('rooms').select().eq('code', code).single();
+      if(error || !room) throw new Error('その部屋番号は見つからないダカラ');
+      vsState.roomId = room.id;
+      vsState.roomCode = room.code;
+      await vsJoinAsPlayer(name);
+    } catch(err){
+      vsSetStatus(err.message || String(err));
+    }
+  }
+
+  async function vsJoinAsPlayer(name){
+    try {
+      const { data: existing, error: listErr } = await sb.from('players').select().eq('room_id', vsState.roomId);
+      if(listErr) throw listErr;
+      const playerCount = (existing || []).filter(p => p.role === 'player').length;
+      const role = playerCount < 2 ? 'player' : 'spectator';
+      const color = role === 'player' ? vsColorFor(playerCount) : null;
+      const { data: player, error } = await sb.from('players')
+        .insert({ room_id: vsState.roomId, name, role, color })
+        .select().single();
+      if(error) throw error;
+      vsState.myPlayerId = player.id;
+      vsState.myRole = role;
+      vsState.myName = name;
+      vsEnterRoomScreen();
+    } catch(err){
+      vsSetStatus('参加失敗ダカラ: ' + (err.message || err));
+    }
+  }
+
+  function vsEnterRoomScreen(){
+    document.getElementById('vs-room-code-display').textContent = vsState.roomCode;
+    showOverlayById('vs-room-overlay');
+    vsSubscribeRoom();
+    vsRefreshPlayerList();
+  }
+
+  async function vsRefreshPlayerList(){
+    const { data: players } = await sb.from('players').select().eq('room_id', vsState.roomId).order('joined_at');
+    vsState.players = players || [];
+    const listEl = document.getElementById('vs-player-list');
+    listEl.innerHTML = vsState.players.map(p => {
+      const dot = '<span class="dot" style="background:' + (p.color || 'var(--ink-dim)') + '"></span>';
+      return '<div class="vs-player-row">' + dot + p.name + '<span class="role">' + (p.role === 'player' ? '対戦者' : '観戦') + '</span></div>';
+    }).join('');
+    const startBtn = document.getElementById('vs-start-btn');
+    const playerCount = vsState.players.filter(p => p.role === 'player').length;
+    startBtn.style.display = (vsState.myRole === 'player' && playerCount >= 2 && !vsState.playing) ? '' : 'none';
+  }
+
+  function vsSubscribeRoom(){
+    if(vsState.channel) sb.removeChannel(vsState.channel);
+    vsState.channel = sb.channel('room-' + vsState.roomId)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'players', filter:'room_id=eq.' + vsState.roomId }, () => vsRefreshPlayerList())
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'claims', filter:'room_id=eq.' + vsState.roomId }, payload => vsHandleClaim(payload.new))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'rooms', filter:'id=eq.' + vsState.roomId }, payload => vsHandleRoomUpdate(payload.new))
+      .subscribe();
+  }
+
+  function vsHandleRoomUpdate(room){
+    if(room.status === 'playing' && !vsState.playing){
+      vsStartMatch(room.settings);
+    } else if(room.status === 'finished' && vsState.playing){
+      vsFinishMatch();
+    }
+  }
+
+  document.getElementById('vs-start-btn').addEventListener('click', async () => {
+    await sb.from('rooms').update({ status: 'playing' }).eq('id', vsState.roomId);
+  });
+
+  function vsPlayerColor(playerId){
+    const p = vsState.players.find(p => p.id === playerId);
+    return p && p.color ? p.color : '#888';
+  }
+
+  function vsHandleClaim(claim){
+    const feature = COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === claim.country_name);
+    if(!feature) return;
+    feature.properties.__correct = true;
+    feature.properties.__claimedBy = claim.player_id;
+    const layer = layers[claim.country_name];
+    const marker = smallMarkers[claim.country_name];
+    const color = vsPlayerColor(claim.player_id);
+    const style = { fillColor: color, fillOpacity: 0.85, color: currentTheme === 'light' ? '#fff' : '#0b1622', weight: 1 };
+    if(layer) layer.setStyle(style);
+    if(marker) marker.setStyle({ ...style, radius: 6, weight: 1.5 });
+    const flag = flagEmoji(feature.properties.cca2);
+    bindCountryTooltip(feature, marker || layer, flag + " " + claim.country_name, 'correct-tip', marker ? 'top' : 'center', marker ? [0,-6] : [0,0]);
+    vsUpdateScoreboard();
+    if(claim.player_id === vsState.myPlayerId){
+      showToast(flag + " " + claim.country_name + " ゲットダカラ！");
+    }
+    vsCheckAllClaimed();
+  }
+
+  function vsUpdateScoreboard(){
+    const counts = {};
+    COUNTRY_GEOJSON.features.forEach(f => {
+      if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
+    });
+    const players = vsState.players.filter(p => p.role === 'player');
+    document.getElementById('bonus-status').style.display = 'none';
+    document.getElementById('dobon-status').style.display = '';
+    const labelEl = document.querySelector('#dobon-status .label');
+    if(labelEl) labelEl.textContent = 'スコア';
+    document.getElementById('dobon-status-value').innerHTML = players.map(p =>
+      '<span style="color:' + (p.color || '#888') + '">' + p.name + ': ' + (counts[p.id] || 0) + '</span>'
+    ).join(' ／ ');
+  }
+
+  function vsCheckAllClaimed(){
+    const total = COUNTRY_GEOJSON.features.filter(f =>
+      vsState.regionFilter === "all" || f.properties.region_ja === vsState.regionFilter
+    ).length;
+    const claimed = COUNTRY_GEOJSON.features.filter(f => f.properties.__claimedBy).length;
+    if(claimed >= total && vsState.myRole === 'player'){
+      sb.from('rooms').update({ status: 'finished' }).eq('id', vsState.roomId);
+    }
+  }
+
+  function vsStartMatch(settings){
+    vsState.playing = true;
+    vsState.regionFilter = settings.region || "all";
+    resetLayers();
+    COUNTRY_GEOJSON.features.forEach(f => { delete f.properties.__claimedBy; });
+    state.region = settings.region || "all";
+    document.getElementById('map').classList.remove('map-hidden');
+    document.getElementById('hud').style.display = '';
+    document.body.classList.add('playing');
+    showOverlayById(null);
+    map.setView([20,10], 2);
+    setTimeout(updateSmallMarkers, 200);
+    vsUpdateScoreboard();
+  }
+
+  function vsFinishMatch(){
+    vsState.playing = false;
+    document.body.classList.remove('playing');
+    const counts = {};
+    COUNTRY_GEOJSON.features.forEach(f => {
+      if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
+    });
+    const players = vsState.players.filter(p => p.role === 'player');
+    const maxCount = Math.max(0, ...players.map(p => counts[p.id] || 0));
+    const listEl = document.getElementById('vs-result-list');
+    listEl.innerHTML = players.map(p => {
+      const c = counts[p.id] || 0;
+      const isWinner = c === maxCount && maxCount > 0;
+      return '<div class="vs-result-row' + (isWinner ? ' winner' : '') + '">' +
+        p.name + '：' + c + 'ヶ国' + (isWinner ? ' 🏆' : '') + '</div>';
+    }).join('');
+    showOverlayById('vs-result-overlay');
+  }
+
+  document.getElementById('vs-create-confirm-btn').addEventListener('click', vsCreateRoom);
+  document.getElementById('vs-join-btn').addEventListener('click', vsJoinRoom);
+  document.getElementById('vs-leave-btn').addEventListener('click', () => {
+    if(vsState.channel && sb) sb.removeChannel(vsState.channel);
+    vsState.roomId = null;
+    showOverlayById('overlay');
+  });
+  document.getElementById('vs-result-back-btn').addEventListener('click', () => {
+    if(vsState.channel && sb) sb.removeChannel(vsState.channel);
+    vsState.roomId = null;
+    showOverlayById('overlay');
   });
 
   document.getElementById('dobon-toggle').addEventListener('change', e => {

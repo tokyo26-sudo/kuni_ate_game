@@ -50,7 +50,12 @@
     font-family:'Zen Kaku Gothic New', sans-serif; overflow:hidden; }
   .mono { font-family:'JetBrains Mono', monospace; }
 
-  #app { display:flex; flex-direction:column; height:100vh; }
+  #app { display:flex; flex-direction:column; height:100vh; height:100dvh; }
+
+  @media (max-width: 720px){
+    html, body { overflow-y:auto !important; height:auto; min-height:100%; }
+    #app { height:auto; min-height:100dvh; }
+  }
 
   /* ---------- Header ---------- */
   header {
@@ -103,16 +108,23 @@
   }
   @media (max-width: 720px){
     #hud {
-      top:8px; padding:6px 10px; gap:10px; border-radius:10px;
-      max-width:96vw; flex-wrap:nowrap; overflow-x:auto;
+      top:8px; padding:6px 10px; gap:8px; border-radius:10px;
+      max-width:96vw; flex-wrap:wrap; justify-content:center;
     }
+    #hud .stat { min-width:0; flex:0 1 auto; }
     #hud .stat .label { font-size:8px; }
-    #hud .stat .value { font-size:13px !important; }
+    #hud .stat .value { font-size:12px !important; }
     #dobon-status-value, #bonus-status-value {
-      white-space:nowrap !important; overflow-x:auto; max-width:38vw;
-      font-size:10px !important; display:block;
+      white-space:normal !important;
+      max-width:70vw;
+      font-size:9px !important;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
-    #bonus-status { max-width:38vw !important; }
+    #bonus-status { max-width:70vw !important; }
   }
 
   /* ---------- Answer panel ---------- */
@@ -293,7 +305,7 @@
     <div class="brand">
       <span class="mark">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.59</span>
+      <span class="sub mono" id="version-tag">v0.62</span>
     </div>
 
     <div id="header-controls">
@@ -987,10 +999,17 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(!cands.length) return null;
     if(!cur) return cands[Math.floor(Math.random() * cands.length)];
     const withDist = cands.map(f => ({ f, d: cur.distanceTo(centroids[f.properties.name_ja]) }));
-    withDist.sort((a, b) => b.d - a.d);
-    const poolSize = Math.max(1, Math.ceil(withDist.length * 0.3)); // 遠い方から上位3割をプールにするダカラ
-    const pool = withDist.slice(0, poolSize);
-    return pool[Math.floor(Math.random() * pool.length)].f;
+    // 上位3割に固定するとハワイ諸島みたいな「常に端っこの国」だけ偏って出るダカラ、
+    // 距離の2乗を重みにして、遠いほど選ばれやすいケド全国が候補に残る抽選方式にするネ
+    const weights = withDist.map(x => x.d * x.d);
+    const total = weights.reduce((a, b) => a + b, 0);
+    if(total <= 0) return withDist[Math.floor(Math.random() * withDist.length)].f;
+    let r = Math.random() * total;
+    for(let i = 0; i < withDist.length; i++){
+      r -= weights[i];
+      if(r <= 0) return withDist[i].f;
+    }
+    return withDist[withDist.length - 1].f;
   }
 
   function selectFeatureByKeyboard(feature){
@@ -1697,6 +1716,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resetLayers();
     COUNTRY_GEOJSON.features.forEach(f => { delete f.properties.__claimedBy; });
     state.region = settings.region || "all";
+    state.mode = settings.mode || "countdown";
+    state.timeLimit = settings.timeLimit || 180;
+    state.timeLeft = state.timeLimit;
+    state.elapsed = 0;
     state.running = true;
     state.vsMode = true;
     state.reviewMode = false;
@@ -1707,9 +1730,27 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     map.setView([20,10], 2);
     setTimeout(updateSmallMarkers, 200);
     vsUpdateScoreboard();
+
+    timeDisplay.classList.remove('warn');
+    timeDisplay.textContent = state.mode === "countdown" ? fmtTime(state.timeLeft) : "00:00";
+    if(state.timer) clearInterval(state.timer);
+    state.timer = setInterval(() => {
+      if(state.mode === "countdown"){
+        state.timeLeft -= 1;
+        timeDisplay.textContent = fmtTime(state.timeLeft);
+        timeDisplay.classList.toggle('warn', state.timeLeft <= 10);
+        if(state.timeLeft <= 0 && vsState.myRole === 'player'){
+          sb.from('rooms').update({ status:'finished' }).eq('id', vsState.roomId);
+        }
+      } else {
+        state.elapsed += 1;
+        timeDisplay.textContent = fmtTime(state.elapsed);
+      }
+    }, 1000);
   }
 
   function vsFinishMatch(){
+    if(state.timer){ clearInterval(state.timer); state.timer = null; }
     vsState.playing = false;
     state.running = false;
     state.vsMode = false;

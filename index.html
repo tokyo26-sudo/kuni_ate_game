@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.91</span>
+      <span class="sub mono" id="version-tag">v0.92</span>
     </div>
   </header>
 
@@ -859,9 +859,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const region = feature.properties.region_ja;
       const isOceaniaTiny = isTinyMarker && region === "大洋州";
       const zoomedTarget = isOceaniaTiny ? Math.min(map.getZoom(), 3) : Math.max(map.getZoom(), 4);
-      const targetPoint = map.project(c, zoomedTarget).subtract([0, bottomPad / 2]);
-      const targetLatLng = map.unproject(targetPoint, zoomedTarget);
-      map.flyTo(targetLatLng, zoomedTarget, { animate:true, duration:0.45 });
+      // 前は手動でピクセルをズラしてたケド、スマホのキーボード対応の高さ調整と二重に効いて
+      // 国が画面外まで飛んでっちゃうバグになってたダカラ、シンプルに中央寄せに戻すヨ
+      map.flyTo(c, zoomedTarget, { animate:true, duration:0.45 });
     } else {
       map.panTo(c, { animate:true, duration:0.3 });
     }

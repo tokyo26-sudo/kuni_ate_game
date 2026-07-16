@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>世界の国名当てゲーム</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.92</span>
+      <span class="sub mono" id="version-tag">v0.94</span>
     </div>
   </header>
 
@@ -794,17 +794,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   const submitBtn = document.getElementById('submit-btn');
   const toast = document.getElementById('toast');
 
-  // スマホでキーボードが出た時、地図が見切れたり回答欄がキーボードの下に隠れたりするダカラ、
-  // VisualViewport APIで実際に見えてる範囲に高さと位置を合わせ直すヨ
+  // スマホでキーボードが出た時、回答欄がキーボードの下に隠れちゃうダカラ、
+  // VisualViewport APIで実際に見えてる範囲に合わせて位置をズラすヨ
+  // （地図自体のサイズをJSで強制的にいじると、逆に地図が変な位置に飛ぶ不具合の元になってたから、
+  //  地図のサイズ調整はブラウザ本来のCSS(100dvh)に任せて、ココでは回答欄の位置だけ直すダカラ）
   let resetViewportOverrides = () => {};
   if(window.visualViewport){
     const vv = window.visualViewport;
-    const appEl = document.getElementById('app');
-    const mapEl = document.getElementById('map');
     const handleViewportResize = () => {
-      appEl.style.height = vv.height + 'px';
-      mapEl.style.top = '0px';
-      mapEl.style.height = vv.height + 'px';
       const hiddenBelow = window.innerHeight - vv.height - vv.offsetTop;
       // PCだと回答欄はtopで中央寄せしてる作りダカラ、bottomまで指定すると引き伸ばされちゃうネ
       // スマホ幅（かつキーボードで隠れてる時）だけ、位置をずらすようにするダカラ
@@ -818,12 +815,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vv.addEventListener('resize', handleViewportResize);
     vv.addEventListener('scroll', handleViewportResize);
     handleViewportResize();
-    // 設定画面に戻る時、地図・入力欄に残ってる高さ/位置の指定を消して、
-    // CSS本来のレイアウト(ヘッダーが隠れちゃう等の不具合の元)に戻すダカラ
     resetViewportOverrides = () => {
-      appEl.style.height = '';
-      mapEl.style.top = '';
-      mapEl.style.height = '';
       answerPanel.style.bottom = '';
     };
   }

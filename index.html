@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.94</span>
+      <span class="sub mono" id="version-tag">v0.95</span>
     </div>
   </header>
 
@@ -810,7 +810,16 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       } else {
         answerPanel.style.bottom = '';
       }
-      if(map && map.invalidateSize) map.invalidateSize();
+      if(map && map.invalidateSize){
+        // iOS Safariは入力欄にフォーカスするとページ自体をスクロールして持ち上げるダカラ、
+        // 地図の内部的な位置情報がズレちゃうネ。invalidateSizeで実際の位置に合わせ直して、
+        // 選んでる国があれば、その国が見えるように地図を再センタリングするヨ
+        map.invalidateSize({ pan:false });
+        if(state.activeFeature){
+          const c = centroids[state.activeFeature.properties.name_ja];
+          if(c) map.panTo(c, { animate:false });
+        }
+      }
     };
     vv.addEventListener('resize', handleViewportResize);
     vv.addEventListener('scroll', handleViewportResize);
@@ -833,6 +842,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const layer = layers[name];
     const isTinyMarker = !!smallMarkers[name];
     const isMobile = window.innerWidth <= 720;
+    // キーボードが出てる状態でジャンプすると、地図の内部位置がズレたままになってることがあるダカラ、
+    // 移動する前に一度、実際の位置に合わせ直しておくヨ
+    if(map.invalidateSize) map.invalidateSize({ pan:false });
     // 入力パネルが画面下端に固定表示ダカラ、地図の中心はソノ分だけ上にズラして、
     // 選んだ国がパネルと被らないようにするヨ
     const bottomPad = isMobile ? 260 : 170;

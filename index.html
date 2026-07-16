@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.83</span>
+      <span class="sub mono" id="version-tag">v0.85</span>
     </div>
 
     <div id="header-controls">
@@ -833,11 +833,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     setTimeout(() => toast.classList.remove('show'), 900);
   }
 
-  // 中米の地峡にある国（メキシコ〜パナマ）は、南北アメリカ大陸に挟まれてる分、
-  // ズームインしたままの方がむしろ位置が分かりやすいダカラ、ズームアウト対象から外すヨ
-  const CENTRAL_AMERICA_ISTHMUS = new Set([
-    "メキシコ","グアテマラ","ベリーズ","ホンジュラス","エルサルバドル","ニカラグア","コスタリカ","パナマ",
-  ]);
   function focusOnFeature(feature, opts){
     opts = opts || {};
     const name = feature.properties.name_ja;
@@ -857,13 +852,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const c = centroids[name];
     if(!c) return;
     if(opts.fit){
-      // 「周り全部海で位置が分からない」問題が起きるのは、実質オセアニアとカリブ海の小国だけダカラ、
-      // ズームアウトはココだけに絞るヨ。中米の地峡国や欧州の小国はズームインのままの方が分かりやすいネ
+      // 「周り全部海で位置が分からない」問題が起きるのは、実質オセアニアの島国だけダカラ、
+      // ズームアウトはココだけに絞るヨ
       const region = feature.properties.region_ja;
-      const isCaribbean = isTinyMarker && region === "北米・中米" && !CENTRAL_AMERICA_ISTHMUS.has(name);
       const isOceaniaTiny = isTinyMarker && region === "大洋州";
-      const shouldZoomOut = isCaribbean || isOceaniaTiny;
-      const zoomedTarget = shouldZoomOut ? Math.min(map.getZoom(), 3) : Math.max(map.getZoom(), 4);
+      const zoomedTarget = isOceaniaTiny ? Math.min(map.getZoom(), 3) : Math.max(map.getZoom(), 4);
       const targetPoint = map.project(c, zoomedTarget).subtract([0, bottomPad / 2]);
       const targetLatLng = map.unproject(targetPoint, zoomedTarget);
       map.flyTo(targetLatLng, zoomedTarget, { animate:true, duration:0.45 });

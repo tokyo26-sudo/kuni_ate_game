@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.79</span>
+      <span class="sub mono" id="version-tag">v0.80</span>
     </div>
 
     <div id="header-controls">
@@ -794,6 +794,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   // スマホでキーボードが出た時、地図が見切れたり回答欄がキーボードの下に隠れたりするダカラ、
   // VisualViewport APIで実際に見えてる範囲に高さと位置を合わせ直すヨ
+  let resetViewportOverrides = () => {};
   if(window.visualViewport){
     const vv = window.visualViewport;
     const appEl = document.getElementById('app');
@@ -815,6 +816,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vv.addEventListener('resize', handleViewportResize);
     vv.addEventListener('scroll', handleViewportResize);
     handleViewportResize();
+    // 設定画面に戻る時、地図・入力欄に残ってる高さ/位置の指定を消して、
+    // CSS本来のレイアウト(ヘッダーが隠れちゃう等の不具合の元)に戻すダカラ
+    resetViewportOverrides = () => {
+      appEl.style.height = '';
+      mapEl.style.top = '';
+      mapEl.style.height = '';
+      answerPanel.style.bottom = '';
+    };
   }
 
   function showToast(msg, wrong){
@@ -1667,6 +1676,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     scoreDisplay.textContent = "0 / 0";
     pointsDisplay.textContent = "0";
     timeDisplay.textContent = "--:--";
+    resetViewportOverrides();
     showOverlayById('overlay');
   });
 
@@ -2280,6 +2290,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('giveup-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
+    resetViewportOverrides();
     showOverlayById('overlay');
   });
   document.getElementById('vs-result-back-btn').addEventListener('click', () => {
@@ -2291,6 +2302,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('giveup-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
+    resetViewportOverrides();
     showOverlayById('overlay');
   });
 
@@ -2314,6 +2326,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('giveup-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
+    resetViewportOverrides();
     overlay.classList.remove('hidden');
   });
   document.getElementById('giveup-btn').addEventListener('click', () => {

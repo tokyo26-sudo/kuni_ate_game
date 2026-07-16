@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.80</span>
+      <span class="sub mono" id="version-tag">v0.81</span>
     </div>
 
     <div id="header-controls">
@@ -1107,9 +1107,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(!cands.length) return null;
     if(!cur) return cands[Math.floor(Math.random() * cands.length)];
     const withDist = cands.map(f => ({ f, d: cur.distanceTo(centroids[f.properties.name_ja]) }));
-    // 上位3割に固定するとハワイ諸島みたいな「常に端っこの国」だけ偏って出るダカラ、
-    // 距離の2乗を重みにして、遠いほど選ばれやすいケド全国が候補に残る抽選方式にするネ
-    const weights = withDist.map(x => x.d * x.d);
+    // 距離の2乗だと、フィジーやカリブ海・中米・オセアニアみたいな「地球上でとにかく孤立した場所」が
+    // 極端に選ばれやすくなっちゃうダカラ、重みを弱めるヨ。
+    // ① 指数を2→0.5(平方根)にして、遠い/近いの差を大人しくするネ
+    // ② 15000km以上はソレ以上重みを増やさない(頭打ち)ようにして、地球の裏側同士の差を潰すダカラ
+    const CAP_M = 15000 * 1000;
+    const weights = withDist.map(x => Math.sqrt(Math.min(x.d, CAP_M)));
     const total = weights.reduce((a, b) => a + b, 0);
     if(total <= 0) return withDist[Math.floor(Math.random() * withDist.length)].f;
     let r = Math.random() * total;

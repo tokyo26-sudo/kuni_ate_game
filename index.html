@@ -299,6 +299,11 @@
     background:transparent; color:inherit; border:none; box-shadow:none;
     font-size:16px; padding:0; cursor:pointer;
   }
+  .leaflet-tooltip.hint-tip.selected {
+    background:rgba(255,255,255,0.9); border-radius:6px;
+    box-shadow:0 0 0 3px var(--gold), 0 0 10px rgba(0,0,0,0.4);
+    padding:2px 4px;
+  }
 </style>
 </head>
 <body class="theme-light">
@@ -307,7 +312,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.73</span>
+      <span class="sub mono" id="version-tag">v0.77</span>
     </div>
 
     <div id="header-controls">
@@ -800,7 +805,13 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       mapEl.style.top = '0px';
       mapEl.style.height = vv.height + 'px';
       const hiddenBelow = window.innerHeight - vv.height - vv.offsetTop;
-      answerPanel.style.bottom = (12 + Math.max(0, hiddenBelow)) + 'px';
+      // PCだと回答欄はtopで中央寄せしてる作りダカラ、bottomまで指定すると引き伸ばされちゃうネ
+      // スマホ幅（かつキーボードで隠れてる時）だけ、位置をずらすようにするダカラ
+      if(window.innerWidth <= 720 && hiddenBelow > 0){
+        answerPanel.style.bottom = (12 + hiddenBelow) + 'px';
+      } else {
+        answerPanel.style.bottom = '';
+      }
       if(map && map.invalidateSize) map.invalidateSize();
     };
     vv.addEventListener('resize', handleViewportResize);
@@ -846,6 +857,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
   }
 
+  let skipNextOutsideClose = false;
+
   function onCountryClick(feature, layer){
     if(!state.running) return;
     if(feature.properties.__correct) return;
@@ -853,7 +866,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       showToast("選択中の地域の範囲外ダカラ", true);
       return;
     }
+    // このクリックで新しく国を選んだダカラ、直後に来る「外側クリックで閉じる」判定は1回だけ無視するヨ
+    skipNextOutsideClose = true;
     // 前に選択してた国のハイライトを解除
+    const prevName = state.activeFeature ? state.activeFeature.properties.name_ja : null;
     if(state.activeFeature && state.activeFeature !== feature){
       const prevLayer = layers[state.activeFeature.properties.name_ja];
       const prevMarker = smallMarkers[state.activeFeature.properties.name_ja];
@@ -866,12 +882,28 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const isMarker = layer instanceof L.CircleMarker;
       layer.setStyle(isMarker ? activeMarkerStyleFor() : activeStyleFor());
     }
+    updateActiveHintOutline(prevName);
     panelRegion.textContent = feature.properties.region_ja;
     answerPanel.classList.add('show');
     document.getElementById('center-marker').classList.add('show');
     answerInput.value = "";
     answerInput.focus();
     focusOnFeature(feature, { fit:false });
+  }
+
+  // 今どの国を選んでるか、国旗ヒントの表示にも枠線で分かるようにするダカラ
+  function updateActiveHintOutline(prevName){
+    if(prevName && hintTooltips[prevName]){
+      const el = hintTooltips[prevName].getElement();
+      if(el) el.classList.remove('selected');
+    }
+    if(state.activeFeature){
+      const name = state.activeFeature.properties.name_ja;
+      if(hintTooltips[name]){
+        const el = hintTooltips[name].getElement();
+        if(el) el.classList.add('selected');
+      }
+    }
   }
 
   function closePanel(){
@@ -883,9 +915,19 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       if(layer) layer.setStyle(styleFor(state.activeFeature, false));
       if(marker) marker.setStyle(markerStyleFor(state.activeFeature, false));
     }
+    const prevName = state.activeFeature ? state.activeFeature.properties.name_ja : null;
     state.activeFeature = null;
     state.activeLayer = null;
+    updateActiveHintOutline(prevName);
   }
+
+  // 回答ウィンドウの外側をクリックしたら、ウィンドウを閉じるダカラ
+  document.addEventListener('click', (e) => {
+    if(!answerPanel.classList.contains('show')) return;
+    if(skipNextOutsideClose){ skipNextOutsideClose = false; return; }
+    if(answerPanel.contains(e.target)) return;
+    closePanel();
+  });
 
   const manualTooltips = {};
 
@@ -1258,6 +1300,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
           if(target) handleMapClick(f, target);
         });
         hintTooltips[name] = tt;
+      }
+      // 今選んでる国のヒント表示にだけ、選択中とわかる枠線を付けるダカラ
+      const el = hintTooltips[name].getElement();
+      if(el){
+        const isActive = state.activeFeature && state.activeFeature.properties.name_ja === name;
+        el.classList.toggle('selected', !!isActive);
       }
     });
   }

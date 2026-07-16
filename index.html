@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.90</span>
+      <span class="sub mono" id="version-tag">v0.91</span>
     </div>
   </header>
 
@@ -1276,7 +1276,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function currentHintFontSize(){
     const zoom = map.getZoom();
-    return Math.round(Math.min(90, Math.max(14, 16 + (zoom - 2) * 12)));
+    return Math.round(Math.min(120, Math.max(14, 16 + (zoom - 2) * 20)));
   }
 
   function refreshHintTooltips(){

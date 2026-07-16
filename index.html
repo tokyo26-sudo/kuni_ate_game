@@ -62,7 +62,7 @@
   .brand { display:flex; align-items:baseline; gap:8px; margin-right:auto; }
   .brand .mark { color:var(--gold); font-weight:900; font-size:22px; letter-spacing:0.02em; }
   .brand .sub { color:var(--ink-dim); font-size:11px; letter-spacing:0.15em; }
-  #header-controls { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+  #header-controls { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
   @media (max-width: 720px){
     body.playing header { display:none; }
   }
@@ -193,7 +193,7 @@
   #overlay.hidden { display:none; }
   #overlay h1 { font-size:15px; letter-spacing:0.25em; color:var(--gold); margin:0; font-weight:700; }
   #overlay h2 { font-size:32px; margin:0; font-weight:900; }
-  #overlay .desc { color:var(--ink-dim); font-size:13px; max-width:420px; line-height:1.7; }
+  #overlay .desc { color:var(--ink-dim); font-size:13px; max-width:420px; line-height:1.7; text-align:left; }
   .overlay-controls { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:center; }
 
   #dobon-overlay {
@@ -310,47 +310,8 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.85</span>
+      <span class="sub mono" id="version-tag">v0.90</span>
     </div>
-
-    <div id="header-controls">
-      <select id="region-select">
-        <option value="all">全世界 (198)</option>
-      </select>
-
-      <select id="mode-select">
-        <option value="countdown">制限時間モード</option>
-        <option value="timeattack">タイムアタック</option>
-      </select>
-
-      <select id="time-select">
-        <option value="60">1分</option>
-        <option value="180" selected>3分</option>
-        <option value="300">5分</option>
-      </select>
-
-      <label class="ctl" id="dobon-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-        <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
-        ドボンルール
-      </label>
-      <select id="dobon-mode-select" style="display:none;">
-        <option value="penalty" selected>減点</option>
-        <option value="out">アウト</option>
-      </select>
-
-      <label class="ctl" id="bonus-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-        <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
-        ボーナスルール
-      </label>
-
-      <label class="ctl" id="flagmode-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-        <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim); width:14px; height:14px;">
-        国旗表示モード
-      </label>
-
-      <button class="ctl" id="theme-toggle">🌙 ダーク</button>
-    </div>
-    <button class="primary" id="start-btn">スタート</button>
   </header>
 
   <div id="map-wrap">
@@ -410,7 +371,48 @@
       <h2>準備はいい？</h2>
       <div class="desc">
         地図上の国をクリックして、国名を入力してクダサイ。<br>
-        上のメニューでモードと地域、制限時間を選んでからスタートしてクダサイ。
+        下のメニューでモードと地域、制限時間を選んでからスタートしてクダサイ。
+      </div>
+      <div id="header-controls">
+        <select id="region-select">
+          <option value="all">全世界 (198)</option>
+        </select>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <select id="mode-select">
+            <option value="countdown">制限時間モード</option>
+            <option value="timeattack">タイムアタック</option>
+          </select>
+
+          <select id="time-select">
+            <option value="60">1分</option>
+            <option value="180" selected>3分</option>
+            <option value="300">5分</option>
+          </select>
+        </div>
+
+        <label class="ctl" id="flagmode-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim); width:14px; height:14px;">
+          国旗表示モード
+        </label>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="ctl" id="dobon-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
+            ドボンルール
+          </label>
+          <select id="dobon-mode-select" style="display:none;">
+            <option value="penalty" selected>減点</option>
+            <option value="out">アウト</option>
+          </select>
+        </div>
+
+        <label class="ctl" id="bonus-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
+          ボーナスルール
+        </label>
+
+        <button class="ctl" id="theme-toggle">🌙 ダーク</button>
       </div>
       <div class="overlay-controls">
         <button class="primary" id="overlay-start-btn">ゲームスタート</button>
@@ -1224,7 +1226,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   const resultPanel = document.getElementById('result-panel');
   const rpHeadline = document.getElementById('rp-headline');
   const rpMain = document.getElementById('rp-main');
-  const startBtn = document.getElementById('start-btn');
   const overlayStartBtn = document.getElementById('overlay-start-btn');
   const rpRetryBtn = document.getElementById('rp-retry-btn');
   const rpBackBtn = document.getElementById('rp-back-btn');
@@ -1513,7 +1514,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       document.body.classList.add('playing');
       state.running = true;
       state.reviewMode = false;
-      startBtn.disabled = true;
+      overlayStartBtn.disabled = true;
 
       if(state.timer) clearInterval(state.timer);
       state.timer = setInterval(tick, 1000);
@@ -1550,7 +1551,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function endGame(cleared, dobonOut){
     state.running = false;
     state.reviewMode = true;
-    startBtn.disabled = false;
+    overlayStartBtn.disabled = false;
     document.getElementById('giveup-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
@@ -2317,10 +2318,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('vs-dobon-mode-select').style.display = e.target.checked ? '' : 'none';
   });
 
-  startBtn.addEventListener('click', () => {
-    if(state.running) return;
-    startGame();
-  });
   overlayStartBtn.addEventListener('click', startGame);
   rpRetryBtn.addEventListener('click', startGame);
   rpBackBtn.addEventListener('click', () => {

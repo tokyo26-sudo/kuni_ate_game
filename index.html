@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.95</span>
+      <span class="sub mono" id="version-tag">v0.96</span>
     </div>
   </header>
 
@@ -794,14 +794,26 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   const submitBtn = document.getElementById('submit-btn');
   const toast = document.getElementById('toast');
 
-  // スマホでキーボードが出た時、回答欄がキーボードの下に隠れちゃうダカラ、
-  // VisualViewport APIで実際に見えてる範囲に合わせて位置をズラすヨ
-  // （地図自体のサイズをJSで強制的にいじると、逆に地図が変な位置に飛ぶ不具合の元になってたから、
-  //  地図のサイズ調整はブラウザ本来のCSS(100dvh)に任せて、ココでは回答欄の位置だけ直すダカラ）
+  // スマホの入力欄にフォーカスすると、ブラウザ(Safari系エンジン)が「入力欄が見えるように」ト
+  // ページ自体を勝手にスクロールして持ち上げちゃうダカラ、地図がズレて見えるんだったネ。
+  // 地図を再センタリングするより、コノ「勝手なスクロール」自体を毎回打ち消す方が確実ダカラ、ソウするヨ
   let resetViewportOverrides = () => {};
+  function killUnwantedScroll(){
+    if(window.scrollX !== 0 || window.scrollY !== 0){
+      window.scrollTo(0, 0);
+    }
+  }
+  window.addEventListener('scroll', killUnwantedScroll, { passive:true });
+  answerInput.addEventListener('focus', () => {
+    killUnwantedScroll();
+    setTimeout(killUnwantedScroll, 50);
+    setTimeout(killUnwantedScroll, 150);
+    setTimeout(killUnwantedScroll, 300);
+  });
   if(window.visualViewport){
     const vv = window.visualViewport;
     const handleViewportResize = () => {
+      killUnwantedScroll();
       const hiddenBelow = window.innerHeight - vv.height - vv.offsetTop;
       // PCだと回答欄はtopで中央寄せしてる作りダカラ、bottomまで指定すると引き伸ばされちゃうネ
       // スマホ幅（かつキーボードで隠れてる時）だけ、位置をずらすようにするダカラ
@@ -810,16 +822,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       } else {
         answerPanel.style.bottom = '';
       }
-      if(map && map.invalidateSize){
-        // iOS Safariは入力欄にフォーカスするとページ自体をスクロールして持ち上げるダカラ、
-        // 地図の内部的な位置情報がズレちゃうネ。invalidateSizeで実際の位置に合わせ直して、
-        // 選んでる国があれば、その国が見えるように地図を再センタリングするヨ
-        map.invalidateSize({ pan:false });
-        if(state.activeFeature){
-          const c = centroids[state.activeFeature.properties.name_ja];
-          if(c) map.panTo(c, { animate:false });
-        }
-      }
+      if(map && map.invalidateSize) map.invalidateSize({ pan:false });
     };
     vv.addEventListener('resize', handleViewportResize);
     vv.addEventListener('scroll', handleViewportResize);

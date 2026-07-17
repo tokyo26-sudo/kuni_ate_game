@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.96</span>
+      <span class="sub mono" id="version-tag">v0.97</span>
     </div>
   </header>
 
@@ -591,7 +591,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     maxZoom: 6,
     worldCopyJump: true,
     attributionControl: false,
-  }).setView([20, 160], 2);
+  }).setView([20, 10], 2);
 
   const regionSet = new Set(["all"]);
   COUNTRY_GEOJSON.features.forEach(f => regionSet.add(f.properties.region_ja));
@@ -1527,7 +1527,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       state.timer = setInterval(tick, 1000);
 
       if(state.region === "all"){
-        map.setView([20,160], 2);
+        map.setView([20,10], 2);
       } else {
         const feats = COUNTRY_GEOJSON.features.filter(f => f.properties.region_ja === state.region);
         const group = L.featureGroup(feats.map(f => layers[f.properties.name_ja]).filter(Boolean));
@@ -2238,7 +2238,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.body.classList.add('playing');
     document.getElementById('vs-force-end-btn').style.display = vsIsHost() ? '' : 'none';
     showOverlayById(null);
-    map.setView([20,160], 2);
+    map.setView([20,10], 2);
     setTimeout(updateSmallMarkers, 200);
     vsUpdateScoreboard();
 

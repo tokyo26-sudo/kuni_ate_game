@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.97</span>
+      <span class="sub mono" id="version-tag">v0.98</span>
     </div>
   </header>
 
@@ -382,6 +382,7 @@
           <select id="mode-select">
             <option value="countdown">制限時間モード</option>
             <option value="timeattack">タイムアタック</option>
+            <option value="hint">ヒントモード（練習用）</option>
           </select>
 
           <select id="time-select">
@@ -1010,8 +1011,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         return;
       }
 
-      // ゲームが続く場合は地理的分散ボーナスを計算するダカラ
-      const distBonus = diversityBonusFor(feature);
+      // ゲームが続く場合は地理的分散ボーナスを計算するダカラ（ヒントモードはスコアなしダカラ計算しないヨ）
+      const distBonus = state.hintPractice ? 0 : diversityBonusFor(feature);
       state.points += distBonus;
       state.answeredFeatures.push(feature);
       const bonusTag = distBonus > 0 ? ("（+" + distBonus + "pt）") : "";
@@ -1485,11 +1486,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.elapsed = 0;
     state.timeLeft = state.timeLimit;
     state.missed = [];
-    state.dobonEnabled = document.getElementById('dobon-toggle').checked;
+    // ヒントモードは練習用ダカラ、ドボン・ボーナスは強制的にオフにするヨ
+    const isHintPractice = state.mode === 'hint';
+    state.hintPractice = isHintPractice;
+    state.dobonEnabled = isHintPractice ? false : document.getElementById('dobon-toggle').checked;
     state.dobonMode = document.getElementById('dobon-mode-select').value;
     state.dobonFeature = null;
     state.dobonPenalties = 0;
-    state.bonusEnabled = document.getElementById('bonus-toggle').checked;
+    state.bonusEnabled = isHintPractice ? false : document.getElementById('bonus-toggle').checked;
     state.bonusSet = [];
     state.flagMode = document.getElementById('flagmode-toggle').checked;
     state.points = 0;
@@ -1498,11 +1502,15 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resetLayers();
     closePanel();
 
+    // ヒントモードは、国旗・頭文字・英語名がドノ国でも最初から常に見えるようにするダカラ
+    activeHintTypes = isHintPractice ? new Set(['flag','initial','en']) : new Set();
+
     state.total = COUNTRY_GEOJSON.features.filter(f =>
       state.region === "all" || f.properties.region_ja === state.region
     ).length;
     updateScore();
     updatePoints();
+    document.getElementById('points-display').closest('.stat').style.display = isHintPractice ? 'none' : '';
 
     timeDisplay.classList.remove('warn');
     timeDisplay.textContent = state.mode === "countdown" ? fmtTime(state.timeLeft) : "00:00";
@@ -1534,7 +1542,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         if(feats.length) map.fitBounds(group.getBounds(), { padding:[20,20] });
       }
       setTimeout(updateSmallMarkers, 200);
-      if(state.flagMode) refreshHintTooltips();
+      if(state.flagMode || state.hintPractice) refreshHintTooltips();
     };
 
     const afterDobon = () => {
@@ -1583,7 +1591,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     const rpPoints = document.getElementById('rp-points');
     const rpRate = document.getElementById('rp-rate');
-    if(dobonOut){
+    if(dobonOut || state.hintPractice){
       rpPoints.textContent = "";
       rpRate.textContent = "";
     } else {
@@ -2323,6 +2331,19 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   });
   document.getElementById('vs-dobon-toggle').addEventListener('change', e => {
     document.getElementById('vs-dobon-mode-select').style.display = e.target.checked ? '' : 'none';
+  });
+
+  // ヒントモードはスコアなしの練習用ダカラ、ドボン・ボーナスの項目は隠しちゃうネ
+  document.getElementById('mode-select').addEventListener('change', e => {
+    const isHintPractice = e.target.value === 'hint';
+    ['dobon-toggle-label','bonus-toggle-label'].forEach(id => {
+      document.getElementById(id).style.display = isHintPractice ? 'none' : '';
+    });
+    if(isHintPractice){
+      document.getElementById('dobon-toggle').checked = false;
+      document.getElementById('dobon-mode-select').style.display = 'none';
+      document.getElementById('bonus-toggle').checked = false;
+    }
   });
 
   overlayStartBtn.addEventListener('click', startGame);

@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.98</span>
+      <span class="sub mono" id="version-tag">v0.99</span>
     </div>
   </header>
 
@@ -1502,8 +1502,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resetLayers();
     closePanel();
 
-    // ヒントモードは、国旗・頭文字・英語名がドノ国でも最初から常に見えるようにするダカラ
-    activeHintTypes = isHintPractice ? new Set(['flag','initial','en']) : new Set();
+    // ヒントモードは、国旗・英語名まで出すと密集地帯で文字が重なりすぎるダカラ、頭文字1文字だけにするヨ
+    activeHintTypes = isHintPractice ? new Set(['initial']) : new Set();
 
     state.total = COUNTRY_GEOJSON.features.filter(f =>
       state.region === "all" || f.properties.region_ja === state.region

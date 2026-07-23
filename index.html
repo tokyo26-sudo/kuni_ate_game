@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.17</span>
+      <span class="sub mono" id="version-tag">v1.20</span>
     </div>
   </header>
 
@@ -318,9 +318,9 @@
     <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
     <button class="ctl" id="vs-force-end-btn" style="display:none; position:absolute; top:16px; right:110px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">対戦を終了する</button>
     <div id="hud" style="display:none;">
-      <div class="stat" id="dobon-status" style="display:none;">
+      <div class="stat" id="dobon-status" style="display:none; max-width:520px;">
         <div class="label">ドボン</div>
-        <div class="value mono" id="dobon-status-value" style="color:var(--red); font-size:15px;"></div>
+        <div class="value mono" id="dobon-status-value" style="color:var(--red); font-size:15px; white-space:normal; line-height:1.6;"></div>
       </div>
       <div class="stat" id="bonus-status" style="display:none; max-width:420px;">
         <div class="label">ボーナス</div>
@@ -459,6 +459,14 @@
             <input type="checkbox" id="vs-bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
             ボーナスルール
           </label>
+          <select id="vs-score-metric-select">
+            <option value="count" selected>スコア: 答えた数</option>
+            <option value="area_km2">スコア: 面積合計</option>
+            <option value="population">スコア: 人口合計</option>
+          </select>
+          <select id="vs-score-direction-select" style="display:none;">
+            <option value="high" selected>多い方が勝ちダカラ</option>
+          </select>
         </div>
         <button class="primary" id="vs-create-confirm-btn">部屋を作成</button>
       </div>
@@ -1835,6 +1843,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       mode: document.getElementById('vs-mode-select').value,
       region: document.getElementById('vs-region-select').value,
       timeLimit: parseInt(document.getElementById('vs-time-select').value, 10),
+      scoreMetric: document.getElementById('vs-score-metric-select').value,
+      scoreDirection: document.getElementById('vs-score-direction-select').value,
     };
     // ドボン・ボーナスも、対戦の２人に同じ内容が伝わるよう、部屋を作る時に先に決めておくダカラ
     settings.dobonEnabled = document.getElementById('vs-dobon-toggle').checked;
@@ -1952,7 +1962,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const timeLabel = s.mode === 'timeattack' ? '' : (' ・ ' + Math.round((s.timeLimit || 180) / 60) + '分');
     const dobonLabel = s.dobonEnabled ? (' ・ ドボン:' + (s.dobonMode === 'out' ? 'アウト' : '減点')) : '';
     const bonusLabel = s.bonusEnabled ? ' ・ ボーナスあり' : '';
-    el.textContent = 'ルール：' + regionLabel + ' ・ ' + modeLabel + timeLabel + dobonLabel + bonusLabel;
+    const metricLabel = s.scoreMetric === 'area_km2' ? ' ・ スコア:面積合計('
+      : s.scoreMetric === 'population' ? ' ・ スコア:人口合計('
+      : '';
+    const scoreLabel = metricLabel ? metricLabel + (s.scoreDirection === 'low' ? '少ない方が勝ち)' : '多い方が勝ち)') : '';
+    el.textContent = 'ルール：' + regionLabel + ' ・ ' + modeLabel + timeLabel + dobonLabel + bonusLabel + scoreLabel;
   }
 
   async function vsRefreshPlayerList(){
@@ -2237,15 +2251,68 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsCheckAllClaimed();
   }
 
-  function vsUpdateScoreboard(){
-    const counts = {};
+  // スコアの数え方(答えた数/面積/人口)、部屋作成時の設定に応じて切り替えるダカラ
+  function vsScoreValue(feature){
+    const metric = state.vsScoreMetric || 'count';
+    if(metric === 'count') return 1;
+    const v = feature.properties[metric];
+    return typeof v === 'number' ? v : 0;
+  }
+
+  // 人口は🧑‍🤝‍🧑=1億人、🧍=1千万人、面積は🟩=100万km²の絵文字ゲージで見せるダカラ
+  // （日本くらいの人口だと🧑‍🤝‍🧑🧍🧍みたいな感じになるヨ）
+  function vsGaugeFor(value, metric){
+    const CAP = 24; // 長くなりすぎないよう上限つけるネ
+    if(metric === 'area_km2'){
+      const squares = Math.round(Math.max(0, value) / 1000000);
+      const shown = Math.min(squares, CAP);
+      return '🟩'.repeat(shown) + (squares > CAP ? '…' : '');
+    }
+    if(metric === 'population'){
+      let remaining = Math.max(0, value);
+      const big = Math.floor(remaining / 100000000);
+      remaining -= big * 100000000;
+      const small = Math.round(remaining / 10000000);
+      const shownBig = Math.min(big, CAP);
+      const gauge = '🧑\u200d🤝\u200d🧑'.repeat(shownBig) + '🧍'.repeat(Math.min(small, 9));
+      return gauge + (big > CAP ? '…' : '');
+    }
+    return '';
+  }
+
+  function vsFormatScore(value){
+    const metric = state.vsScoreMetric || 'count';
+    const rounded = Math.round(value);
+    if(metric === 'count') return String(rounded);
+    const gauge = vsGaugeFor(rounded, metric);
+    if(metric === 'area_km2') return rounded.toLocaleString('ja-JP') + ' km² ' + gauge;
+    return rounded.toLocaleString('ja-JP') + ' 人 ' + gauge;
+  }
+
+  // ドボンのペナルティ計算ダカラ。面積/人口モードの時は、そのドボン国自身じゃなくて、
+  // 「そのプレイヤーが取った国の中で一番大きい国」の分を引くヨ（一番の稼ぎ頭を失う形にするダカラ）
+  function vsDobonPenaltyFor(playerId){
+    if(!state.vsScoreMetric || state.vsScoreMetric === 'count') return 1;
+    let maxVal = 0;
     COUNTRY_GEOJSON.features.forEach(f => {
-      if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
+      if(f.properties.__claimedBy === playerId){
+        const v = vsScoreValue(f);
+        if(v > maxVal) maxVal = v;
+      }
     });
-    // ドボン国を取っちゃったプレイヤーは、ここで1マイナスされるダカラ
+    return maxVal;
+  }
+
+  function vsUpdateScoreboard(){
+    const totals = {};
+    COUNTRY_GEOJSON.features.forEach(f => {
+      if(f.properties.__claimedBy) totals[f.properties.__claimedBy] = (totals[f.properties.__claimedBy] || 0) + vsScoreValue(f);
+    });
+    // ドボン国を取っちゃったプレイヤーは、ここでマイナスされるダカラ
+    // （面積/人口モードの時は、そのプレイヤーが取った国の中で一番大きい国の分マイナスするヨ）
     if(state.dobonEnabled && vsState.dobonClaimedPlayerId){
       const pid = vsState.dobonClaimedPlayerId;
-      counts[pid] = (counts[pid] || 0) - 1;
+      totals[pid] = (totals[pid] || 0) - vsDobonPenaltyFor(pid);
     }
     const players = vsState.players.filter(p => p.role === 'player');
     document.getElementById('bonus-status').style.display = 'none';
@@ -2253,7 +2320,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const labelEl = document.querySelector('#dobon-status .label');
     if(labelEl) labelEl.textContent = 'スコア';
     document.getElementById('dobon-status-value').innerHTML = players.map(p =>
-      '<span style="color:' + (p.color || '#888') + '">' + p.name + ': ' + (counts[p.id] || 0) + '</span>'
+      '<span style="color:' + (p.color || '#888') + '">' + p.name + ': ' + vsFormatScore(totals[p.id] || 0) + '</span>'
     ).join(' ／ ');
   }
 
@@ -2330,6 +2397,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         feature: COUNTRY_GEOJSON.features.find(f => f.properties.name_ja === bc.name),
       }))
       .filter(b => b.feature);
+    state.vsScoreMetric = settings.scoreMetric || 'count';
+    state.vsScoreDirection = settings.scoreDirection || 'high';
   }
 
   function vsStartMatch(settings){
@@ -2387,18 +2456,29 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsHideSimpleOverlays();
     vsState.revealShown = false;
     vsState.standbyShown = false;
-    const counts = {};
+    const totals = {};
     COUNTRY_GEOJSON.features.forEach(f => {
-      if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
+      if(f.properties.__claimedBy) totals[f.properties.__claimedBy] = (totals[f.properties.__claimedBy] || 0) + vsScoreValue(f);
     });
+    if(state.dobonEnabled && vsState.dobonClaimedPlayerId){
+      const pid = vsState.dobonClaimedPlayerId;
+      totals[pid] = (totals[pid] || 0) - vsDobonPenaltyFor(pid);
+    }
     const players = vsState.players.filter(p => p.role === 'player');
-    const maxCount = Math.max(0, ...players.map(p => counts[p.id] || 0));
+    const direction = state.vsScoreDirection || 'high';
+    const values = players.map(p => totals[p.id] || 0);
+    const bestValue = values.length
+      ? (direction === 'low' ? Math.min(...values) : Math.max(...values))
+      : 0;
     const listEl = document.getElementById('vs-result-list');
-    listEl.innerHTML = players.map(p => {
-      const c = counts[p.id] || 0;
-      const isWinner = c === maxCount && maxCount > 0;
+    const metricLabel = state.vsScoreMetric === 'area_km2' ? '（面積合計・' + (direction === 'low' ? '少ない方の勝ちダカラ' : '多い方の勝ちダカラ') + '）'
+      : state.vsScoreMetric === 'population' ? '（人口合計・' + (direction === 'low' ? '少ない方の勝ちダカラ' : '多い方の勝ちダカラ') + '）'
+      : '';
+    listEl.innerHTML = (metricLabel ? '<div class="desc" style="margin-bottom:8px;">' + metricLabel + '</div>' : '') + players.map(p => {
+      const v = totals[p.id] || 0;
+      const isWinner = v === bestValue && (direction === 'low' || bestValue > 0);
       return '<div class="vs-result-row' + (isWinner ? ' winner' : '') + '">' +
-        p.name + '：' + c + 'ヶ国' + (isWinner ? ' 🏆' : '') + '</div>';
+        p.name + '：' + vsFormatScore(v) + (state.vsScoreMetric === 'count' || !state.vsScoreMetric ? 'ヶ国' : '') + (isWinner ? ' 🏆' : '') + '</div>';
     }).join('');
     showOverlayById('vs-result-overlay');
   }

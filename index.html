@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.03</span>
+      <span class="sub mono" id="version-tag">v1.04</span>
     </div>
   </header>
 
@@ -713,18 +713,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     style: f => styleFor(f, false),
     onEachFeature: (feature, layer) => {
       layers[feature.properties.name_ja] = layer;
-      layer.on('mouseover', () => {
-        if(isOutOfRegion(feature)) return;
-        if(!feature.properties.__correct && state.activeFeature !== feature){
-          layer.setStyle(hoverStyleFor());
-        }
-      });
-      layer.on('mouseout', () => {
-        if(isOutOfRegion(feature)) return;
-        if(!feature.properties.__correct && state.activeFeature !== feature){
-          layer.setStyle(styleFor(feature, false));
-        }
-      });
       layer.on('click', () => handleMapClick(feature, layer));
     }
   }).addTo(map);

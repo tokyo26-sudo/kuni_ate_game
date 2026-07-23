@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v0.99</span>
+      <span class="sub mono" id="version-tag">v0.100</span>
     </div>
   </header>
 
@@ -877,6 +877,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   let skipNextOutsideClose = false;
 
+  const DEFAULT_ANSWER_PLACEHOLDER = "選んだ国の名前（通称）を入れてね";
+  let hintPracticeTimer = null;
+
   function onCountryClick(feature, layer){
     if(!state.running) return;
     if(feature.properties.__correct) return;
@@ -907,6 +910,22 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     answerInput.value = "";
     answerInput.focus();
     focusOnFeature(feature, { fit:false });
+
+    // ヒントモードダカラ、入力欄のプレースホルダー(薄い字)に頭文字を出すヨ。
+    // 10秒間何も入力ナカッタラ、文字数も分かるようにするネ
+    clearTimeout(hintPracticeTimer);
+    if(state.hintPractice){
+      const nameJa = feature.properties.name_ja;
+      const initial = nameJa.charAt(0);
+      answerInput.placeholder = initial;
+      hintPracticeTimer = setTimeout(() => {
+        if(state.activeFeature === feature && !answerInput.value){
+          answerInput.placeholder = initial + "◯".repeat(Math.max(0, nameJa.length - 1));
+        }
+      }, 10000);
+    } else {
+      answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER;
+    }
   }
 
   // 今どの国を選んでるか、国旗ヒントの表示にも枠線で分かるようにするダカラ
@@ -927,6 +946,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function closePanel(){
     answerPanel.classList.remove('show');
     document.getElementById('center-marker').classList.remove('show');
+    clearTimeout(hintPracticeTimer);
+    answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER;
     if(state.activeFeature && !state.activeFeature.properties.__correct){
       const layer = layers[state.activeFeature.properties.name_ja];
       const marker = smallMarkers[state.activeFeature.properties.name_ja];
@@ -1210,7 +1231,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
 
   function tick(){
-    if(state.mode === "countdown"){
+    if(state.mode === "countdown" || state.mode === "hint"){
       state.timeLeft -= 1;
       timeDisplay.textContent = fmtTime(state.timeLeft);
       timeDisplay.classList.toggle('warn', state.timeLeft <= 10);
@@ -1489,6 +1510,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     // ヒントモードは練習用ダカラ、ドボン・ボーナスは強制的にオフにするヨ
     const isHintPractice = state.mode === 'hint';
     state.hintPractice = isHintPractice;
+    if(isHintPractice){
+      // ヒントモードは時間選択に関係なく3分固定ダカラ
+      state.timeLimit = 180;
+      state.timeLeft = 180;
+    }
     state.dobonEnabled = isHintPractice ? false : document.getElementById('dobon-toggle').checked;
     state.dobonMode = document.getElementById('dobon-mode-select').value;
     state.dobonFeature = null;
@@ -1502,8 +1528,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resetLayers();
     closePanel();
 
-    // ヒントモードは、国旗・英語名まで出すと密集地帯で文字が重なりすぎるダカラ、頭文字1文字だけにするヨ
-    activeHintTypes = isHintPractice ? new Set(['initial']) : new Set();
+    // ヒントモードは入力欄のプレースホルダーで頭文字を出す方式にしたダカラ、地図側のヒント表示は使わないヨ
+    activeHintTypes = new Set();
 
     state.total = COUNTRY_GEOJSON.features.filter(f =>
       state.region === "all" || f.properties.region_ja === state.region
@@ -1513,7 +1539,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('points-display').closest('.stat').style.display = isHintPractice ? 'none' : '';
 
     timeDisplay.classList.remove('warn');
-    timeDisplay.textContent = state.mode === "countdown" ? fmtTime(state.timeLeft) : "00:00";
+    timeDisplay.textContent = (state.mode === "countdown" || state.mode === "hint") ? fmtTime(state.timeLeft) : "00:00";
 
     document.getElementById('time-select').style.display = state.mode === "countdown" ? "" : "none";
 
@@ -1542,7 +1568,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         if(feats.length) map.fitBounds(group.getBounds(), { padding:[20,20] });
       }
       setTimeout(updateSmallMarkers, 200);
-      if(state.flagMode || state.hintPractice) refreshHintTooltips();
+      if(state.flagMode) refreshHintTooltips();
     };
 
     const afterDobon = () => {
@@ -1580,7 +1606,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       ? "ドボン国を踏んでしまったダカラ、ゲームオーバー！"
       : cleared
       ? "全問正解ダカラ！おめでとうネ！"
-      : (state.mode === "countdown" ? "タイムアップ！" : "中断（未クリア）");
+      : ((state.mode === "countdown" || state.mode === "hint") ? "タイムアップ！" : "中断（未クリア）");
 
     const shown = Math.max(0, state.correctCount - state.dobonPenalties);
     if(state.mode === "timeattack" && !dobonOut){

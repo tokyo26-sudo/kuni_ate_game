@@ -80,7 +80,6 @@
     border-radius:6px; padding:8px 12px; font-family:inherit; font-size:13px; cursor:pointer;
   }
   select:hover, button.ctl:hover { border-color:var(--gold-dim); }
-  button.ctl.active { background:var(--gold); color:#1a1206; border-color:var(--gold); font-weight:700; }
 
   button.primary {
     background:var(--gold); color:#1a1206; border:none; border-radius:6px;
@@ -311,13 +310,12 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.10</span>
+      <span class="sub mono" id="version-tag">v1.13</span>
     </div>
   </header>
 
   <div id="map-wrap">
     <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
-    <button class="ctl" id="mask-flags-btn" style="display:none; position:absolute; top:16px; right:110px; z-index:9400;" title="選んでる国以外の国旗を隠すダカラ（ショートカット: H）">🙈 他の国旗を隠す</button>
     <button class="ctl" id="vs-force-end-btn" style="display:none; position:absolute; top:16px; right:110px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">対戦を終了する</button>
     <div id="hud" style="display:none;">
       <div class="stat" id="dobon-status" style="display:none;">
@@ -1239,21 +1237,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       selectFeatureByKeyboard(findDirectional(dx, dy));
       return;
     }
-    if((e.key === 'h' || e.key === 'H') && document.activeElement !== answerInput && state.flagMode){
+    if(e.key === '/' && state.flagMode){
       e.preventDefault();
-      toggleMaskOtherFlags();
+      state.maskOtherFlags = !state.maskOtherFlags;
+      refreshHintTooltips();
     }
   });
-
-  // 「他の国旗を隠す」の切り替えダカラ（ボタンとHキー、両方コレを呼ぶヨ）
-  function toggleMaskOtherFlags(){
-    state.maskOtherFlags = !state.maskOtherFlags;
-    const btn = document.getElementById('mask-flags-btn');
-    btn.textContent = state.maskOtherFlags ? "👁️ 国旗を全部見せる" : "🙈 他の国旗を隠す";
-    btn.classList.toggle('active', state.maskOtherFlags);
-    refreshHintTooltips();
-  }
-  document.getElementById('mask-flags-btn').addEventListener('click', toggleMaskOtherFlags);
 
   // ---------- score / timer ----------
   const scoreDisplay = document.getElementById('score-display');
@@ -1406,6 +1395,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       // ボーナス発動中のヒント(頭文字・中国語・韓国語・英語・国旗)は、地図全体じゃなくて
       // 選んだ国の入力欄に薄く出す方式に変えたダカラ、コッチには国旗モードの分だけ出すヨ
       // 「他の国旗を隠す」がONの時は、今選んでる国以外の国旗は出さないダカラ
+      // 「/」キーでON/OFFする、選んでる国以外の国旗を隠す機能ダカラ
       const isMasked = state.maskOtherFlags && state.activeFeature !== f;
       if(state.flagMode && !isMasked) parts.push(hintValueFor(f, 'flag'));
       if(!parts.length){
@@ -1638,9 +1628,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const reallyStart = () => {
       document.getElementById('map').classList.remove('map-hidden');
       document.getElementById('giveup-btn').style.display = '';
-      document.getElementById('mask-flags-btn').style.display = state.flagMode ? '' : 'none';
-      document.getElementById('mask-flags-btn').textContent = "🙈 他の国旗を隠す";
-      document.getElementById('mask-flags-btn').classList.remove('active');
       document.getElementById('hud').style.display = '';
       document.body.classList.add('playing');
       state.running = true;
@@ -1684,7 +1671,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.reviewMode = true;
     overlayStartBtn.disabled = false;
     document.getElementById('giveup-btn').style.display = 'none';
-    document.getElementById('mask-flags-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
     document.getElementById('bonus-status').style.display = 'none';
@@ -1802,7 +1788,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
-    document.getElementById('mask-flags-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
     document.getElementById('bonus-status').style.display = 'none';
@@ -2426,7 +2411,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
-    document.getElementById('mask-flags-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
     resetViewportOverrides();
@@ -2439,7 +2423,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
-    document.getElementById('mask-flags-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
     resetViewportOverrides();
@@ -2473,7 +2456,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
-    document.getElementById('mask-flags-btn').style.display = 'none';
     document.getElementById('vs-force-end-btn').style.display = 'none';
     document.body.classList.remove('playing');
     resetViewportOverrides();

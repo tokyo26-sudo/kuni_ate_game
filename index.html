@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.20</span>
+      <span class="sub mono" id="version-tag">v1.23</span>
     </div>
   </header>
 
@@ -2259,23 +2259,19 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     return typeof v === 'number' ? v : 0;
   }
 
-  // 人口は🧑‍🤝‍🧑=1億人、🧍=1千万人、面積は🟩=100万km²の絵文字ゲージで見せるダカラ
-  // （日本くらいの人口だと🧑‍🤝‍🧑🧍🧍みたいな感じになるヨ）
+  // 人口・面積の絵文字ゲージダカラ。単位は試合開始時に地域の合計値から決めてるヨ
+  // （人口は、単位が大きい時は群衆っぽい👥、小さい時は🧍を使うダカラ）
   function vsGaugeFor(value, metric){
-    const CAP = 24; // 長くなりすぎないよう上限つけるネ
+    const CAP = 30; // 長くなりすぎないよう上限つけるネ
+    const unit = state.vsGaugeUnit || (metric === 'area_km2' ? 1000000 : 10000000);
+    const count = Math.round(Math.max(0, value) / unit);
+    const shown = Math.min(count, CAP);
     if(metric === 'area_km2'){
-      const squares = Math.round(Math.max(0, value) / 1000000);
-      const shown = Math.min(squares, CAP);
-      return '🟩'.repeat(shown) + (squares > CAP ? '…' : '');
+      return '🟩'.repeat(shown) + (count > CAP ? '…' : '');
     }
     if(metric === 'population'){
-      let remaining = Math.max(0, value);
-      const big = Math.floor(remaining / 100000000);
-      remaining -= big * 100000000;
-      const small = Math.round(remaining / 10000000);
-      const shownBig = Math.min(big, CAP);
-      const gauge = '🧑\u200d🤝\u200d🧑'.repeat(shownBig) + '🧍'.repeat(Math.min(small, 9));
-      return gauge + (big > CAP ? '…' : '');
+      const emoji = unit >= 100000000 ? '👨\u200d👩\u200d👧\u200d👦' : '🧍';
+      return emoji.repeat(shown) + (count > CAP ? '…' : '');
     }
     return '';
   }
@@ -2399,6 +2395,23 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       .filter(b => b.feature);
     state.vsScoreMetric = settings.scoreMetric || 'count';
     state.vsScoreDirection = settings.scoreDirection || 'high';
+    // ゲージの1個分の単位、選んだ地域の合計値から自動で決めるダカラ
+    // （試合中は固定するから、インド・中国みたいなデカイ国取っても、単位が途中で変わって減ったように見えることはナイヨ）
+    state.vsGaugeUnit = vsChooseGaugeUnit(state.vsScoreMetric, state.region);
+  }
+
+  function vsChooseGaugeUnit(metric, region){
+    if(metric !== 'area_km2' && metric !== 'population') return null;
+    const candidates = COUNTRY_GEOJSON.features.filter(f =>
+      region === "all" || f.properties.region_ja === region
+    );
+    const total = candidates.reduce((s, f) => s + (f.properties[metric] || 0), 0);
+    const TARGET_MAX = 30;
+    const tiers = metric === 'population'
+      ? [10000000, 25000000, 50000000, 100000000, 250000000, 500000000, 1000000000]
+      : [200000, 500000, 1000000, 2000000, 5000000, 10000000];
+    for(const t of tiers){ if(total / t <= TARGET_MAX) return t; }
+    return tiers[tiers.length - 1];
   }
 
   function vsStartMatch(settings){

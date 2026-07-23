@@ -142,8 +142,11 @@
   #answer-panel.show { transform:translate(-50%,0) scale(1); opacity:1; pointer-events:auto; }
   @media (max-width: 720px){
     #answer-panel {
-      bottom:12px; min-width:0; width:92vw;
+      top:64px; bottom:auto; min-width:0; width:92vw;
+      transform:translate(-50%,-8px) scale(0.94);
     }
+    #answer-panel.show { transform:translate(-50%,0) scale(1); }
+    #answer-panel .region-tag { top:-20px; }
   }
   #answer-panel .region-tag {
     font-size:11px; color:var(--ink-dim); position:absolute; top:-22px; left:16px;
@@ -319,7 +322,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.27</span>
+      <span class="sub mono" id="version-tag">v1.28</span>
     </div>
   </header>
 
@@ -798,9 +801,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   const submitBtn = document.getElementById('submit-btn');
   const toast = document.getElementById('toast');
 
-  // スマホの入力欄にフォーカスすると、ブラウザ(Safari系エンジン)が「入力欄が見えるように」ト
-  // ページ自体を勝手にスクロールして持ち上げちゃうダカラ、地図がズレて見えるんだったネ。
-  // 地図を再センタリングするより、コノ「勝手なスクロール」自体を毎回打ち消す方が確実ダカラ、ソウするヨ
+  // 入力パネルを画面上部に固定したダカラ、キーボードを追いかけて位置調整する必要はナクなったヨ。
+  // ソレデモiOS Safari系は、入力欄にフォーカスするとページ自体を勝手にスクロールして持ち上げちゃうカラ、
+  // ソレダケ毎回打ち消しておくネ（地図がズレて見えるのを防ぐダカラ）
   let resetViewportOverrides = () => {};
   function killUnwantedScroll(){
     if(window.scrollX !== 0 || window.scrollY !== 0){
@@ -813,28 +816,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     setTimeout(killUnwantedScroll, 50);
     setTimeout(killUnwantedScroll, 150);
     setTimeout(killUnwantedScroll, 300);
+    setTimeout(() => { if(map && map.invalidateSize) map.invalidateSize({ pan:false }); }, 350);
   });
-  if(window.visualViewport){
-    const vv = window.visualViewport;
-    const handleViewportResize = () => {
-      killUnwantedScroll();
-      const hiddenBelow = window.innerHeight - vv.height - vv.offsetTop;
-      // PCだと回答欄はtopで中央寄せしてる作りダカラ、bottomまで指定すると引き伸ばされちゃうネ
-      // スマホ幅（かつキーボードで隠れてる時）だけ、位置をずらすようにするダカラ
-      if(window.innerWidth <= 720 && hiddenBelow > 0){
-        answerPanel.style.bottom = (12 + hiddenBelow) + 'px';
-      } else {
-        answerPanel.style.bottom = '';
-      }
-      if(map && map.invalidateSize) map.invalidateSize({ pan:false });
-    };
-    vv.addEventListener('resize', handleViewportResize);
-    vv.addEventListener('scroll', handleViewportResize);
-    handleViewportResize();
-    resetViewportOverrides = () => {
-      answerPanel.style.bottom = '';
-    };
-  }
 
   function showToast(msg, wrong){
     toast.textContent = msg;

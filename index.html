@@ -310,7 +310,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.04</span>
+      <span class="sub mono" id="version-tag">v1.05</span>
     </div>
   </header>
 
@@ -899,9 +899,17 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     answerInput.focus();
     focusOnFeature(feature, { fit:false });
 
-    // ヒントモードダカラ、最初は文字数だけ、5秒後に頭文字も加えて出すヨ
-    // （文字数も「読み」ベースで数えるダカラ、頭文字と矛盾しないヨ）
+    // ヒントモード・ボーナスヒント、どっちも入力欄のプレースホルダー(薄い字)で見せるダカラ
     clearTimeout(hintPracticeTimer);
+    updateAnswerPlaceholder();
+  }
+
+  // 選んでる国に応じて、入力欄のプレースホルダー(薄い字)を更新するダカラ
+  // ヒントモード（文字数→頭文字の段階表示）と、ボーナス発動中のヒント(頭文字/中国語/韓国語/英語/国旗)、両方コレで出すヨ
+  function updateAnswerPlaceholder(){
+    const feature = state.activeFeature;
+    if(!feature){ answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER; return; }
+
     if(state.hintPractice){
       const reading = hintReadingFor(feature.properties.name_ja);
       const initial = reading.charAt(0);
@@ -911,9 +919,24 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
           answerInput.placeholder = initial + "◯".repeat(Math.max(0, reading.length - 1));
         }
       }, 5000);
-    } else {
-      answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER;
+      return;
     }
+
+    if(state.bonusEnabled && activeHintTypes.size > 0){
+      const parts = [];
+      ['flag','initial','zh','ko','en'].forEach(t => {
+        if(activeHintTypes.has(t)){
+          const v = hintValueFor(feature, t);
+          if(v) parts.push(v);
+        }
+      });
+      if(parts.length){
+        answerInput.placeholder = parts.join(' ') + " のヒントダカラ";
+        return;
+      }
+    }
+
+    answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER;
   }
 
   // 今どの国を選んでるか、国旗ヒントの表示にも枠線で分かるようにするダカラ
@@ -1329,10 +1352,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const anchor = centroids[name];
       if(!anchor) return;
       const parts = [];
-      if(state.flagMode || activeHintTypes.has('flag')) parts.push(hintValueFor(f, 'flag'));
-      ['initial','zh','ko','en'].forEach(t => {
-        if(activeHintTypes.has(t)){ const v = hintValueFor(f, t); if(v) parts.push(v); }
-      });
+      // ボーナス発動中のヒント(頭文字・中国語・韓国語・英語・国旗)は、地図全体じゃなくて
+      // 選んだ国の入力欄に薄く出す方式に変えたダカラ、コッチには国旗モードの分だけ出すヨ
+      if(state.flagMode) parts.push(hintValueFor(f, 'flag'));
       if(!parts.length){
         if(hintTooltips[name]){ map.removeLayer(hintTooltips[name]); delete hintTooltips[name]; }
         return;
@@ -1363,9 +1385,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function activateHint(type){
     activeHintTypes.add(type);
     refreshHintTooltips();
+    updateAnswerPlaceholder();
     setTimeout(() => {
       activeHintTypes.delete(type);
       refreshHintTooltips();
+      updateAnswerPlaceholder();
     }, HINT_DURATION);
   }
 

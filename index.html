@@ -323,7 +323,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.32</span>
+      <span class="sub mono" id="version-tag">v1.33</span>
     </div>
   </header>
 
@@ -401,7 +401,6 @@
           </select>
 
           <select id="time-select">
-            <option value="60">1分</option>
             <option value="180" selected>3分</option>
             <option value="300">5分</option>
           </select>
@@ -463,7 +462,6 @@
             <option value="timeattack">タイムアタック(全部揃うまで)</option>
           </select>
           <select id="vs-time-select">
-            <option value="60">1分</option>
             <option value="180" selected>3分</option>
             <option value="300">5分</option>
           </select>
@@ -644,7 +642,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       regionSelect.value = region;
     }
     const time = params.get('time');
-    if(time && ['60','180','300'].includes(time)){
+    if(time && ['180','300'].includes(time)){
       document.getElementById('time-select').value = time;
     }
     if(params.get('dobon') === '1'){

@@ -288,6 +288,22 @@
   #result-panel .legend .dot.default { background:var(--land-default); }
   #result-panel button.primary { margin-top:4px; }
 
+  #share-modal {
+    position:fixed; inset:0; background:var(--overlay-bg); z-index:9990;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  #share-modal.show { display:flex; }
+  #share-modal-box {
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+    padding:20px; max-width:420px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  }
+  #share-modal-box h2 { margin:0 0 6px; font-size:16px; }
+  #share-text-area {
+    width:100%; height:120px; margin-top:10px; padding:10px; box-sizing:border-box;
+    background:var(--bg-deep); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+    font-family:inherit; font-size:13px; resize:none;
+  }
+
   /* leaflet tooltip override */
   .leaflet-tooltip.correct-tip {
     background:var(--teal); color:#08251c; border:none; font-weight:700; font-size:12px;
@@ -323,7 +339,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.33</span>
+      <span class="sub mono" id="version-tag">v1.34</span>
     </div>
   </header>
 
@@ -378,6 +394,18 @@
         <button class="primary" id="rp-retry-btn">もう一度</button>
         <button class="ctl" id="rp-share-btn">結果をシェア</button>
         <button class="ctl" id="rp-back-btn">設定に戻る</button>
+      </div>
+    </div>
+
+    <div id="share-modal">
+      <div id="share-modal-box">
+        <h2>結果をシェア</h2>
+        <div class="desc">コノテキストをコピーして、SNS等に貼り付けてクダサイネ。</div>
+        <textarea id="share-text-area" readonly></textarea>
+        <div class="overlay-controls">
+          <button class="primary" id="share-copy-btn">コピー</button>
+          <button class="ctl" id="share-close-btn">閉じる</button>
+        </div>
       </div>
     </div>
 
@@ -2491,7 +2519,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   rpRetryBtn.addEventListener('click', startGame);
 
   const MODE_LABELS = { countdown: '制限時間モード', timeattack: 'タイムアタック', hint: 'ヒントモード' };
-  document.getElementById('rp-share-btn').addEventListener('click', async () => {
+  document.getElementById('rp-share-btn').addEventListener('click', () => {
     const r = state.lastResult;
     if(!r) return;
     const regionLabel = (r.region === 'all' || !r.region) ? '全世界' : r.region;
@@ -2522,16 +2550,21 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       pointsLine +
       'あなたも挑戦してみてね→ ' + url;
 
-    if(navigator.share){
-      try { await navigator.share({ text }); } catch(err) { /* キャンセルされても何もしないダカラ */ }
-    } else {
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('結果をコピーしたダカラ！');
-      } catch(err) {
-        showToast('コピーに失敗しちゃったダカラ', true);
-      }
+    document.getElementById('share-text-area').value = text;
+    document.getElementById('share-modal').classList.add('show');
+  });
+  document.getElementById('share-copy-btn').addEventListener('click', async () => {
+    const textArea = document.getElementById('share-text-area');
+    try {
+      await navigator.clipboard.writeText(textArea.value);
+    } catch(err){
+      textArea.select();
+      document.execCommand('copy');
     }
+    showToast('結果をコピーしたダカラ！');
+  });
+  document.getElementById('share-close-btn').addEventListener('click', () => {
+    document.getElementById('share-modal').classList.remove('show');
   });
 
   rpBackBtn.addEventListener('click', () => {

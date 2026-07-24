@@ -133,7 +133,7 @@
 
   /* ---------- Answer panel ---------- */
   #answer-panel {
-    position:fixed; left:50%; top:96px; bottom:auto; transform:translate(-50%,-8px) scale(0.94);
+    position:fixed; left:50%; top:132px; bottom:auto; transform:translate(-50%,-8px) scale(0.94);
     background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
     padding:14px 16px; display:flex; gap:10px; align-items:center;
     box-shadow:0 20px 50px rgba(0,0,0,0.55); transition:transform .18s ease, opacity .18s ease, top .15s ease;
@@ -142,7 +142,7 @@
   #answer-panel.show { transform:translate(-50%,0) scale(1); opacity:1; pointer-events:auto; }
   @media (max-width: 720px){
     #answer-panel {
-      top:64px; bottom:auto; min-width:0; width:92vw;
+      top:100px; bottom:auto; min-width:0; width:92vw;
       transform:translate(-50%,-8px) scale(0.94);
     }
     #answer-panel.show { transform:translate(-50%,0) scale(1); }
@@ -322,7 +322,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.29</span>
+      <span class="sub mono" id="version-tag">v1.30</span>
     </div>
   </header>
 
@@ -869,7 +869,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(map.invalidateSize) map.invalidateSize({ pan:false });
     // 入力パネルが画面上部に固定表示ダカラ、地図の余白もソノ分だけ上側に多めに取って、
     // 選んだ国がパネルと被らないようにするヨ
-    const topPad = isMobile ? 150 : 170;
+    const topPad = isMobile ? 210 : 220;
     if(opts.fit && layer && layer.getBounds && !isTinyMarker){
       const b = computeMainlandBounds(feature) || layer.getBounds();
       if(b.isValid()){

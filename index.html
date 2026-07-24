@@ -323,7 +323,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.31</span>
+      <span class="sub mono" id="version-tag">v1.32</span>
     </div>
   </header>
 
@@ -376,6 +376,7 @@
       <div class="legend"><span class="dot default"></span>まだの国</div>
       <div class="overlay-controls">
         <button class="primary" id="rp-retry-btn">もう一度</button>
+        <button class="ctl" id="rp-share-btn">結果をシェア</button>
         <button class="ctl" id="rp-back-btn">設定に戻る</button>
       </div>
     </div>
@@ -627,6 +628,38 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
   });
   document.getElementById('vs-region-select').innerHTML = regionSelect.innerHTML;
+
+  // シェアされたURL(?mode=...&region=...)から開いた時、設定に反映するダカラ
+  // (他のイベントリスナーがまだ登録されてない可能性があるダカラ、次のティックで実行するヨ)
+  function applySharedSettingsFromURL(){
+    const params = new URLSearchParams(location.search);
+    if(!params.has('mode')) return;
+    const mode = params.get('mode');
+    if(['countdown', 'timeattack', 'hint'].includes(mode)){
+      document.getElementById('mode-select').value = mode;
+      document.getElementById('mode-select').dispatchEvent(new Event('change'));
+    }
+    const region = params.get('region');
+    if(region && [...regionSelect.options].some(o => o.value === region)){
+      regionSelect.value = region;
+    }
+    const time = params.get('time');
+    if(time && ['60','180','300'].includes(time)){
+      document.getElementById('time-select').value = time;
+    }
+    if(params.get('dobon') === '1'){
+      document.getElementById('dobon-toggle').checked = true;
+      document.getElementById('dobon-toggle').dispatchEvent(new Event('change'));
+      const dobonMode = params.get('dobonmode');
+      if(dobonMode === 'out' || dobonMode === 'penalty'){
+        document.getElementById('dobon-mode-select').value = dobonMode;
+      }
+    }
+    if(params.get('bonus') === '1'){
+      document.getElementById('bonus-toggle').checked = true;
+    }
+  }
+  setTimeout(applySharedSettingsFromURL, 0);
 
   function isOutOfRegion(feature){
     return state.region !== "all" && feature.properties.region_ja !== state.region;
@@ -1691,6 +1724,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     const rpPoints = document.getElementById('rp-points');
     const rpRate = document.getElementById('rp-rate');
+    state.lastResult = {
+      dobonOut, cleared,
+      shown, total: state.total,
+      mode: state.mode, region: state.region, timeLimit: state.timeLimit,
+      elapsed: state.elapsed,
+      dobonEnabled: state.dobonEnabled, dobonMode: state.dobonMode, bonusEnabled: state.bonusEnabled,
+      finalPoints: null, perMinute: null,
+    };
     if(dobonOut || state.hintPractice){
       rpPoints.textContent = "";
       rpRate.textContent = "";
@@ -1705,6 +1746,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         : Math.max(1, state.elapsed);
       const perMinute = Math.round(finalPoints / (secondsPlayed / 60));
       rpRate.textContent = "1分あたり平均: " + perMinute + " pt/分";
+      state.lastResult.finalPoints = finalPoints;
+      state.lastResult.perMinute = perMinute;
     }
 
     resultPanel.classList.add('show');
@@ -2448,6 +2491,51 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   overlayStartBtn.addEventListener('click', startGame);
   rpRetryBtn.addEventListener('click', startGame);
+
+  const MODE_LABELS = { countdown: '制限時間モード', timeattack: 'タイムアタック', hint: 'ヒントモード' };
+  document.getElementById('rp-share-btn').addEventListener('click', async () => {
+    const r = state.lastResult;
+    if(!r) return;
+    const regionLabel = (r.region === 'all' || !r.region) ? '全世界' : r.region;
+    const modeLabel = MODE_LABELS[r.mode] || r.mode;
+    const timeLabel = r.mode === 'countdown' ? '・' + Math.round(r.timeLimit / 60) + '分' : '';
+    let scoreLine;
+    if(r.mode === 'timeattack' && !r.dobonOut){
+      scoreLine = fmtTime(r.elapsed) + 'で全' + r.total + 'ヶ国クリアダカラ！';
+    } else {
+      scoreLine = r.shown + '/' + r.total + 'ヶ国正解ダカラ！';
+    }
+    let pointsLine = '';
+    if(r.finalPoints !== null){
+      pointsLine = 'POINTS: ' + r.finalPoints + '（1分あたり ' + r.perMinute + 'pt）\n';
+    }
+
+    // 同じ設定でスグ挑戦できるよう、設定をURLのパラメータに埋め込むダカラ
+    const params = new URLSearchParams();
+    params.set('mode', r.mode);
+    params.set('region', r.region || 'all');
+    if(r.mode === 'countdown') params.set('time', r.timeLimit);
+    if(r.dobonEnabled){ params.set('dobon', '1'); params.set('dobonmode', r.dobonMode || 'penalty'); }
+    if(r.bonusEnabled) params.set('bonus', '1');
+    const url = location.origin + location.pathname + '?' + params.toString();
+
+    const text = '🌍世界の国名当てゲーム\n' +
+      scoreLine + '（' + modeLabel + timeLabel + '・' + regionLabel + '）\n' +
+      pointsLine +
+      'あなたも挑戦してみてね→ ' + url;
+
+    if(navigator.share){
+      try { await navigator.share({ text }); } catch(err) { /* キャンセルされても何もしないダカラ */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('結果をコピーしたダカラ！');
+      } catch(err) {
+        showToast('コピーに失敗しちゃったダカラ', true);
+      }
+    }
+  });
+
   rpBackBtn.addEventListener('click', () => {
     resultPanel.classList.remove('show');
     document.getElementById('map').classList.add('map-hidden');

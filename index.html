@@ -304,6 +304,29 @@
     font-family:inherit; font-size:13px; resize:none;
   }
 
+  #gallery-modal {
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9990;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  #gallery-modal.show { display:flex; }
+  #gallery-modal-box {
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+    padding:20px; max-width:640px; width:100%; max-height:80vh; overflow-y:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  }
+  #gallery-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(84px, 1fr)); gap:10px;
+  }
+  .gallery-item { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .gallery-item img {
+    width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px; border:1px solid var(--line);
+    background:var(--bg-deep);
+  }
+  .gallery-item.locked img { filter:grayscale(1) brightness(0.5); opacity:0.5; }
+  .gallery-item .gallery-name { font-size:10px; color:var(--ink-dim); text-align:center; line-height:1.3; }
+  .gallery-item.locked .gallery-name { opacity:0.4; }
+  #gallery-count-badge { font-size:11px; opacity:0.8; }
+
   /* leaflet tooltip override */
   .leaflet-tooltip.correct-tip {
     background:var(--teal); color:#08251c; border:none; font-weight:700; font-size:12px;
@@ -339,7 +362,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.42</span>
+      <span class="sub mono" id="version-tag">v1.43</span>
     </div>
   </header>
 
@@ -472,6 +495,18 @@
       <div class="overlay-controls">
         <button class="primary" id="overlay-start-btn">ゲームスタート</button>
         <button class="ctl" id="vs-open-btn">⚔️ 対戦モード</button>
+        <button class="ctl" id="gallery-open-btn">🏳️ 国旗図鑑 <span id="gallery-count-badge"></span></button>
+      </div>
+    </div>
+
+    <div id="gallery-modal">
+      <div id="gallery-modal-box">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 style="margin:0;">国旗図鑑</h2>
+          <button class="ctl" id="gallery-close-btn">閉じる</button>
+        </div>
+        <div class="desc" id="gallery-progress-text" style="margin:4px 0 12px;"></div>
+        <div id="gallery-grid"></div>
       </div>
     </div>
 
@@ -1042,6 +1077,24 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   let skipNextOutsideClose = false;
 
   const DEFAULT_ANSWER_PLACEHOLDER = "選んだ国の名前（通称）を入れてね";
+
+  // ---------- 国旗図鑑（正解した国を永続的に記録するダカラ） ----------
+  const FLAG_COLLECTION_KEY = 'kuniAteGame_flagCollection';
+  function loadFlagCollection(){
+    try {
+      const raw = localStorage.getItem(FLAG_COLLECTION_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch(err){ return {}; }
+  }
+  function addToFlagCollection(cca2, nameJa){
+    if(!cca2) return;
+    try {
+      const col = loadFlagCollection();
+      if(!col[cca2]) col[cca2] = nameJa;
+      localStorage.setItem(FLAG_COLLECTION_KEY, JSON.stringify(col));
+    } catch(err){ /* localStorageが使えない環境でも、ゲーム自体は問題なく続けられるようにするダカラ */ }
+  }
+
   let hintPracticeTimer = null;
 
   function onCountryClick(feature, layer){
@@ -1195,6 +1248,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         return;
       }
       feature.properties.__correct = true;
+      addToFlagCollection(feature.properties.cca2, feature.properties.name_ja);
       refreshAllStyles();
       const flag = flagEmoji(feature.properties.cca2);
       const mainLayer = layers[feature.properties.name_ja];
@@ -1911,6 +1965,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     // （試合が本当に始まる時だけ、reallyStart / vsStartMatchの方で改めて表示するヨ）
     if(id !== null){
       document.getElementById('hud').style.display = 'none';
+      if(id === 'overlay' && typeof updateGalleryBadge === 'function') updateGalleryBadge();
     }
   }
 
@@ -2341,6 +2396,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         }
       } else {
         // 自分の分は、Realtime通知を待たずにここで先に反映しちゃうダカラ
+        addToFlagCollection(feature.properties.cca2, feature.properties.name_ja);
         vsHandleClaim({ country_name: feature.properties.name_ja, player_id: vsState.myPlayerId });
       }
     } catch(err){
@@ -2650,6 +2706,47 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   document.getElementById('share-close-btn').addEventListener('click', () => {
     document.getElementById('share-modal').classList.remove('show');
   });
+
+  // ---------- 国旗図鑑 ----------
+  function renderGallery(){
+    const col = loadFlagCollection();
+    const collectedCount = Object.keys(col).length;
+    document.getElementById('gallery-count-badge').textContent =
+      collectedCount > 0 ? '(' + collectedCount + '/' + COUNTRY_GEOJSON.features.length + ')' : '';
+    document.getElementById('gallery-progress-text').textContent =
+      '集めた国旗: ' + collectedCount + ' / ' + COUNTRY_GEOJSON.features.length + 'ヶ国ダカラ';
+
+    const sorted = COUNTRY_GEOJSON.features.slice().sort((a, b) =>
+      (a.properties.name_ja || '').localeCompare(b.properties.name_ja, 'ja'));
+    const grid = document.getElementById('gallery-grid');
+    grid.innerHTML = sorted.map(f => {
+      const p = f.properties;
+      const isCollected = !!col[p.cca2];
+      const code = (p.cca2 || '').toLowerCase();
+      const svgUrl = code ? ('https://flagcdn.com/' + code + '.svg') : '';
+      const nameLabel = isCollected ? p.name_ja : '？？？';
+      return '<div class="gallery-item' + (isCollected ? '' : ' locked') + '">' +
+        (svgUrl ? '<img src="' + svgUrl + '" alt="' + p.name_ja + '" loading="lazy">' : '<div style="width:100%;aspect-ratio:4/3;background:var(--bg-deep);border-radius:4px;"></div>') +
+        '<div class="gallery-name">' + nameLabel + '</div>' +
+        '</div>';
+    }).join('');
+  }
+  document.getElementById('gallery-open-btn').addEventListener('click', () => {
+    renderGallery();
+    document.getElementById('gallery-modal').classList.add('show');
+  });
+  document.getElementById('gallery-close-btn').addEventListener('click', () => {
+    document.getElementById('gallery-modal').classList.remove('show');
+  });
+  // タイトル画面に戻ってきた時、バッジの数字だけ最新化しとくダカラ
+  function updateGalleryBadge(){
+    try {
+      const col = loadFlagCollection();
+      const count = Object.keys(col).length;
+      document.getElementById('gallery-count-badge').textContent = count > 0 ? '(' + count + '/' + COUNTRY_GEOJSON.features.length + ')' : '';
+    } catch(err){ /* 何もしないダカラ */ }
+  }
+  updateGalleryBadge();
 
   rpBackBtn.addEventListener('click', () => {
     resultPanel.classList.remove('show');

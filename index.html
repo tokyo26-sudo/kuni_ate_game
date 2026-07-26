@@ -208,6 +208,27 @@
   #overlay .desc { color:var(--ink-dim); font-size:13px; max-width:420px; line-height:1.7; text-align:left; }
   .overlay-controls { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:center; }
 
+  /* ---------- Overlay setting cards ---------- */
+  #overlay-cards {
+    display:flex; flex-direction:column; gap:14px;
+    width:100%; max-width:440px; align-items:stretch;
+  }
+  .overlay-card {
+    background:var(--bg-panel-2); border:1px solid var(--line); border-radius:14px;
+    padding:16px 20px; text-align:left; display:flex; flex-direction:column; gap:10px;
+  }
+  .overlay-card h3 {
+    margin:0; font-size:12px; letter-spacing:0.1em; color:var(--gold-dim); font-weight:700;
+  }
+  .overlay-card-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .overlay-card-row select { flex:1; min-width:110px; }
+  .overlay-card select, .overlay-card button.ctl { width:100%; }
+  .overlay-toggle-row {
+    display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 0;
+  }
+  .overlay-toggle-row input[type="checkbox"] { width:15px; height:15px; cursor:pointer; flex:none; }
+  .overlay-toggle-row select { margin-left:auto; }
+
   #dobon-overlay {
     position:absolute; inset:0; background:var(--overlay-bg);
     display:none; align-items:center; justify-content:center; z-index:9600;
@@ -362,7 +383,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.43</span>
+      <span class="sub mono" id="version-tag">v1.44</span>
     </div>
   </header>
 
@@ -439,58 +460,69 @@
         地図上の国をクリックして、国名を入力してクダサイ。<br>
         下のメニューでモードと地域、制限時間を選んでからスタートしてクダサイ。
       </div>
-      <div id="header-controls">
-        <select id="region-select">
-          <option value="all">全世界 (198)</option>
-        </select>
-
-        <div style="display:flex; align-items:center; gap:8px;">
-          <select id="mode-select">
-            <option value="countdown">制限時間モード</option>
-            <option value="timeattack">タイムアタック</option>
-            <option value="hint">ヒントモード（練習用）</option>
-          </select>
-
-          <select id="time-select">
-            <option value="180" selected>3分</option>
-            <option value="300">5分</option>
-          </select>
+      <div id="overlay-cards">
+        <div class="overlay-card">
+          <h3>出題モード</h3>
+          <div class="overlay-card-row">
+            <select id="region-select">
+              <option value="all">全世界 (198)</option>
+            </select>
+          </div>
+          <div class="overlay-card-row">
+            <select id="mode-select">
+              <option value="countdown">制限時間モード</option>
+              <option value="timeattack">タイムアタック</option>
+              <option value="hint">ヒントモード（練習用）</option>
+            </select>
+            <select id="time-select">
+              <option value="180" selected>3分</option>
+              <option value="300">5分</option>
+            </select>
+          </div>
         </div>
 
-        <label class="ctl" id="flagmode-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim); width:14px; height:14px;">
-          国旗表示モード
-        </label>
-
-        <div style="display:flex; align-items:center; gap:8px;">
-          <label class="ctl" id="dobon-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
-            ドボンルール
+        <div class="overlay-card">
+          <h3>ヒント・ルール</h3>
+          <label class="overlay-toggle-row" id="flagmode-toggle-label">
+            <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim);">
+            国旗表示モード
           </label>
-          <select id="dobon-mode-select" style="display:none;">
-            <option value="penalty" selected>減点</option>
-            <option value="out">アウト</option>
-          </select>
+          <label class="overlay-toggle-row" id="dobon-toggle-label">
+            <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold);">
+            ドボンルール
+            <select id="dobon-mode-select" style="display:none;">
+              <option value="penalty" selected>減点</option>
+              <option value="out">アウト</option>
+            </select>
+          </label>
+          <label class="overlay-toggle-row" id="bonus-toggle-label">
+            <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal);">
+            ボーナスルール
+          </label>
         </div>
 
-        <label class="ctl" id="bonus-toggle-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
-          ボーナスルール
-        </label>
-
-        <button class="ctl" id="theme-toggle">🌙 ダーク</button>
-        <select id="palette-select">
-          <option value="default" selected>配色: 現行</option>
-          <option value="natural">配色: ナチュラル</option>
-          <option value="chart">配色: 海図風</option>
-        </select>
-        <select id="typesound-select">
-          <option value="off" selected>タイプ音: なし</option>
-          <option value="soft">タイプ音: コトッ</option>
-          <option value="mecha">タイプ音: カタカタ</option>
-          <option value="pop">タイプ音: ポコッ</option>
-          <option value="click">タイプ音: カチカチ</option>
-        </select>
+        <div class="overlay-card">
+          <h3>表示設定</h3>
+          <div class="overlay-card-row">
+            <button class="ctl" id="theme-toggle" style="flex:1;">🌙 ダーク</button>
+          </div>
+          <div class="overlay-card-row">
+            <select id="palette-select">
+              <option value="default" selected>配色: 現行</option>
+              <option value="natural">配色: ナチュラル</option>
+              <option value="chart">配色: 海図風</option>
+            </select>
+          </div>
+          <div class="overlay-card-row">
+            <select id="typesound-select">
+              <option value="off" selected>タイプ音: なし</option>
+              <option value="soft">タイプ音: コトッ</option>
+              <option value="mecha">タイプ音: カタカタ</option>
+              <option value="pop">タイプ音: ポコッ</option>
+              <option value="click">タイプ音: カチカチ</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div class="overlay-controls">
         <button class="primary" id="overlay-start-btn">ゲームスタート</button>

@@ -339,7 +339,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.38</span>
+      <span class="sub mono" id="version-tag">v1.42</span>
     </div>
   </header>
 
@@ -460,6 +460,13 @@
           <option value="default" selected>配色: 現行</option>
           <option value="natural">配色: ナチュラル</option>
           <option value="chart">配色: 海図風</option>
+        </select>
+        <select id="typesound-select">
+          <option value="off" selected>タイプ音: なし</option>
+          <option value="soft">タイプ音: コトッ</option>
+          <option value="mecha">タイプ音: カタカタ</option>
+          <option value="pop">タイプ音: ポコッ</option>
+          <option value="click">タイプ音: カチカチ</option>
         </select>
       </div>
       <div class="overlay-controls">
@@ -867,21 +874,75 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // 音声ファイル用意しなくて済むよう、Web Audio APIでその場で短いクリック音を作るヨ
   let typeAudioCtx = null;
   function playTypeSound(){
+    const mode = document.getElementById('typesound-select').value;
+    if(mode === 'off') return;
     try {
       if(!typeAudioCtx) typeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if(typeAudioCtx.state === 'suspended') typeAudioCtx.resume();
       const now = typeAudioCtx.currentTime;
+
+      if(mode === 'click'){
+        // カチカチ系：ホワイトノイズをバンドパスフィルターに通して、機械式キーボードっぽい質感にするダカラ
+        const bufSize = typeAudioCtx.sampleRate * 0.02;
+        const buf = typeAudioCtx.createBuffer(1, bufSize, typeAudioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for(let i = 0; i < bufSize; i++){ data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize); }
+        const noise = typeAudioCtx.createBufferSource();
+        noise.buffer = buf;
+        const bp = typeAudioCtx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 3200 + Math.random() * 800;
+        bp.Q.value = 1.2;
+        const gain = typeAudioCtx.createGain();
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+        noise.connect(bp);
+        bp.connect(gain);
+        gain.connect(typeAudioCtx.destination);
+        noise.start(now);
+        noise.stop(now + 0.02);
+        return;
+      }
+
       const osc = typeAudioCtx.createOscillator();
       const gain = typeAudioCtx.createGain();
-      osc.type = 'square';
-      // 打鍵ごとに少し高さをランダムに揺らして、単調な音にならないようにするダカラ
-      osc.frequency.setValueAtTime(1400 + Math.random() * 500, now);
-      gain.gain.setValueAtTime(0.06, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-      osc.connect(gain);
-      gain.connect(typeAudioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.05);
+
+      if(mode === 'mecha'){
+        // カタカタ系：矩形波でハッキリした打鍵音ダカラ
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1200 + Math.random() * 400, now);
+        gain.gain.setValueAtTime(0.045, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        osc.connect(gain);
+        gain.connect(typeAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.035);
+      } else if(mode === 'pop'){
+        // ポコッ系：低めの音からちょっと上に跳ねる、丸っこい音ダカラ
+        osc.type = 'sine';
+        const base = 220 + Math.random() * 60;
+        osc.frequency.setValueAtTime(base, now);
+        osc.frequency.exponentialRampToValueAtTime(base * 2.2, now + 0.05);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.connect(gain);
+        gain.connect(typeAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else {
+        // soft(デフォルト)：三角波でピッチをスッと下げる、柔らかい「コトッ」音ダカラ
+        osc.type = 'triangle';
+        const startFreq = 550 + Math.random() * 120;
+        osc.frequency.setValueAtTime(startFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(startFreq * 0.35, now + 0.035);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        osc.connect(gain);
+        gain.connect(typeAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      }
     } catch(err){ /* 音が鳴らせない環境でも、ゲーム自体は問題なく続けられるようにするダカラ */ }
   }
   answerInput.addEventListener('input', playTypeSound);

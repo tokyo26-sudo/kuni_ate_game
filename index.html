@@ -102,7 +102,7 @@
     max-width:94vw;
   }
   #mobile-jump-btn {
-    display:none; position:absolute; right:16px; bottom:96px; z-index:9400;
+    display:none; position:absolute; right:16px; top:78px; z-index:9400;
     width:52px; height:52px; border-radius:50%; border:1px solid var(--line);
     background:var(--gold); color:#1a1206; font-size:22px; box-shadow:0 8px 20px rgba(0,0,0,0.35);
     align-items:center; justify-content:center; cursor:pointer;
@@ -405,7 +405,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.47</span>
+      <span class="sub mono" id="version-tag">v1.48</span>
     </div>
   </header>
 
@@ -1114,27 +1114,32 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     // 入力パネルが画面上部に固定表示ダカラ、地図の余白もソノ分だけ上側に多めに取って、
     // 選んだ国がパネルと被らないようにするヨ
     const topPad = isMobile ? 210 : 220;
-    if(opts.fit && layer && layer.getBounds && !isTinyMarker){
-      const b = computeMainlandBounds(feature) || layer.getBounds();
-      if(b.isValid()){
-        map.flyToBounds(b, { paddingTopLeft:[60,topPad], paddingBottomRight:[60,60], maxZoom:6, animate:true, duration:0.45 });
+    // スマホは国を選んだ直後に入力欄へフォーカスが移ってソフトキーボードが開くダカラ、
+    // 画面下半分がキーボードに隠れちゃうヨ。選んだ国がソコに埋もれないよう下側の余白も多めに確保するダカラ
+    const bottomPad = isMobile ? 300 : 60;
+    if(opts.fit){
+      let b = null;
+      let maxZoom = 6;
+      if(layer && layer.getBounds && !isTinyMarker){
+        b = computeMainlandBounds(feature) || layer.getBounds();
+      }
+      const c = centroids[name];
+      if((!b || !b.isValid()) && c){
+        // 「周り全部海で位置が分からない」問題が起きるのは、実質オセアニアの島国だけダカラ、
+        // ズームアウトはココだけに絞るヨ
+        const region = feature.properties.region_ja;
+        const isOceaniaTiny = isTinyMarker && region === "大洋州";
+        maxZoom = isOceaniaTiny ? Math.min(map.getZoom(), 3) : Math.max(map.getZoom(), 4);
+        b = L.latLngBounds(c, c);
+      }
+      if(b && b.isValid()){
+        map.flyToBounds(b, { paddingTopLeft:[60,topPad], paddingBottomRight:[60,bottomPad], maxZoom, animate:true, duration:0.45 });
         return;
       }
     }
     const c = centroids[name];
     if(!c) return;
-    if(opts.fit){
-      // 「周り全部海で位置が分からない」問題が起きるのは、実質オセアニアの島国だけダカラ、
-      // ズームアウトはココだけに絞るヨ
-      const region = feature.properties.region_ja;
-      const isOceaniaTiny = isTinyMarker && region === "大洋州";
-      const zoomedTarget = isOceaniaTiny ? Math.min(map.getZoom(), 3) : Math.max(map.getZoom(), 4);
-      // 前は手動でピクセルをズラしてたケド、スマホのキーボード対応の高さ調整と二重に効いて
-      // 国が画面外まで飛んでっちゃうバグになってたダカラ、シンプルに中央寄せに戻すヨ
-      map.flyTo(c, zoomedTarget, { animate:true, duration:0.45 });
-    } else {
-      map.panTo(c, { animate:true, duration:0.3 });
-    }
+    map.panTo(c, { animate:true, duration:0.3 });
   }
 
   let skipNextOutsideClose = false;

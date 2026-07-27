@@ -410,7 +410,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.52</span>
+      <span class="sub mono" id="version-tag">v1.54</span>
     </div>
   </header>
 
@@ -528,6 +528,8 @@
           </label>
         </div>
 
+        <button class="primary" id="overlay-start-btn" style="width:100%; max-width:440px;">ゲームスタート</button>
+
         <div class="overlay-card">
           <h3>表示設定</h3>
           <div class="overlay-card-row">
@@ -552,7 +554,6 @@
         </div>
       </div>
       <div class="overlay-controls">
-        <button class="primary" id="overlay-start-btn">ゲームスタート</button>
         <button class="ctl" id="vs-open-btn">⚔️ 対戦モード</button>
         <button class="ctl" id="gallery-open-btn">🏳️ 国旗図鑑 <span id="gallery-count-badge"></span></button>
       </div>
@@ -925,6 +926,21 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     return { latlng: L.latLng((minLat+maxLat)/2, (minLng+maxLng)/2), area: (maxLat-minLat)*(maxLng-minLng) };
   }
 
+  // 首都の座標が、その島（リング）の中に実際に入ってるかどうかをレイキャスティング法で判定するダカラ。
+  // フィリピン・インドネシアみたいに首都が海沿いにあると「中心点との距離」だけの判定だと
+  // 近くの小島を誤って「本土」扱いしちゃうバグがあったから、コッチを優先的に使うヨ
+  function pointInRing(lat, lng, ring){
+    let inside = false;
+    for(let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > lat) !== (yj > lat)) &&
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+      if(intersect) inside = !inside;
+    }
+    return inside;
+  }
+
   function computeHomeAnchor(feature){
     const geom = feature.geometry;
     let polys;
@@ -1077,6 +1093,13 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   // フランス・アメリカみたいに海外領土がある国は、layer.getBounds()だと領土まで全部含んじゃって
   // 本土が小さく見えちゃうダカラ、本土（一番大きい/首都に近いパーツ）だけの範囲を計算するヨ
+  // データ内のcap_lat/cap_lngは国全体のざっくりした代表点で、実際の首都の位置とはズレてることがあるダカラ、
+  // 領土が海で分断されてて誤判定が起きやすい国だけ、正確な首都座標をココで上書きしとくヨ
+  // （マレーシア：代表点がボルネオ島側に入っちゃって、クアラルンプールのある半島側が選ばれなかった問題の対応）
+  const CAPITAL_COORD_OVERRIDE = {
+    'マレーシア': [3.1390, 101.6869], // クアラルンプール
+  };
+
   function computeMainlandBounds(feature){
     const geom = feature.geometry;
     let polys;
@@ -1087,19 +1110,21 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       return L.latLngBounds(polys[0][0].map(pt => L.latLng(pt[1], pt[0])));
     }
 
-    const capLat = feature.properties.cap_lat, capLng = feature.properties.cap_lng;
+    const override = CAPITAL_COORD_OVERRIDE[feature.properties.name_ja];
+    const capLat = override ? override[0] : feature.properties.cap_lat;
+    const capLng = override ? override[1] : feature.properties.cap_lng;
     const parts = polys.map(p => ({ ring: p[0], center: subPolygonBoundsCenter(p[0]) }));
 
-    let mainRing;
+    let mainRing = null;
+    // 一番確実なのは「首都の座標が実際にその島の中に入ってるか」ダカラ、コレを最優先で試すヨ
     if(capLat != null && capLng != null){
-      const cap = L.latLng(capLat, capLng);
-      let best = null, bestDist = Infinity;
-      parts.forEach(p => {
-        const d = cap.distanceTo(p.center.latlng);
-        if(d < bestDist){ bestDist = d; best = p.ring; }
-      });
-      mainRing = best;
-    } else {
+      const hit = parts.find(p => pointInRing(capLat, capLng, p.ring));
+      if(hit) mainRing = hit.ring;
+    }
+    if(!mainRing){
+      // 首都がドノ島の中にも入ってなかった場合（フィリピンみたいに首都座標が海上の代表点になってるコトがあるダカラ）は、
+      // 「中心点が首都に近い島」だと近くの小島を誤って選んじゃうバグがあったので、
+      // 代わりに「面積が一番大きい島」を本土扱いにするヨ（コッチの方が確実に大きい主要な島になるダカラ）
       let best = null, bestArea = -1;
       parts.forEach(p => { if(p.center.area > bestArea){ bestArea = p.center.area; best = p.ring; } });
       mainRing = best;

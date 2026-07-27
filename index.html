@@ -102,7 +102,7 @@
     max-width:94vw;
   }
   #mobile-jump-btn {
-    display:none; position:absolute; right:16px; top:190px; z-index:10001;
+    display:none; position:absolute; right:16px; top:78px; z-index:10001;
     width:52px; height:52px; border-radius:50%; border:1px solid var(--line);
     background:var(--gold); color:#1a1206; font-size:22px; box-shadow:0 8px 20px rgba(0,0,0,0.35);
     align-items:center; justify-content:center; cursor:pointer;
@@ -142,10 +142,11 @@
   #answer-panel.show { transform:translate(-50%,0) scale(1); opacity:1; pointer-events:auto; }
   @media (max-width: 720px){
     #answer-panel {
-      top:100px; bottom:auto; min-width:0; width:92vw;
-      transform:translate(-50%,-8px) scale(0.94);
+      top:100px; bottom:auto; min-width:0;
+      left:12px; right:78px; width:auto;
+      transform:translateY(-8px) scale(0.94);
     }
-    #answer-panel.show { transform:translate(-50%,0) scale(1); }
+    #answer-panel.show { transform:translateY(0) scale(1); }
     #answer-panel .region-tag { top:-20px; }
   }
   #answer-panel .region-tag {
@@ -409,13 +410,13 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.50</span>
+      <span class="sub mono" id="version-tag">v1.51</span>
     </div>
   </header>
 
   <div id="map-wrap">
     <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
-    <button id="mobile-jump-btn" style="display:none;" aria-label="遠くへジャンプ">🚁</button>
+    <button id="mobile-jump-btn" aria-label="遠くへジャンプ">🚁</button>
     <button class="ctl" id="vs-force-end-btn" style="display:none; position:absolute; top:16px; right:110px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">対戦を終了する</button>
     <div id="hud" style="display:none;">
       <div class="stat" id="dobon-status" style="display:none;">

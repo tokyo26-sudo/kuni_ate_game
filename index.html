@@ -410,7 +410,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.55</span>
+      <span class="sub mono" id="version-tag">v1.57</span>
     </div>
   </header>
 
@@ -520,6 +520,10 @@
             <input type="checkbox" id="flagmode-toggle" style="accent-color:var(--gold-dim);">
             国旗表示モード
           </label>
+          <label class="overlay-toggle-row" id="hint-reveal-toggle-label">
+            <input type="checkbox" id="hint-reveal-toggle" style="accent-color:var(--teal);">
+            国名ヒントあり
+          </label>
           <label class="overlay-toggle-row" id="dobon-toggle-label">
             <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold);">
             ドボンルール
@@ -528,9 +532,9 @@
               <option value="out">アウト</option>
             </select>
           </label>
-          <label class="overlay-toggle-row" id="bonus-toggle-label">
-            <input type="checkbox" id="bonus-toggle" style="accent-color:var(--teal);">
-            ボーナスルール
+          <label class="overlay-toggle-row" id="bonus-toggle-label" style="opacity:0.45; cursor:not-allowed;">
+            <input type="checkbox" id="bonus-toggle" disabled style="accent-color:var(--teal);">
+            ボーナスルール（未実装）
           </label>
         </div>
 
@@ -618,9 +622,9 @@
             <option value="penalty" selected>減点</option>
             <option value="out">アウト</option>
           </select>
-          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="vs-bonus-toggle" style="accent-color:var(--teal); width:14px; height:14px;">
-            ボーナスルール
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:not-allowed; opacity:0.45;">
+            <input type="checkbox" id="vs-bonus-toggle" disabled style="accent-color:var(--teal); width:14px; height:14px;">
+            ボーナスルール（未実装）
           </label>
         </div>
         <button class="primary" id="vs-create-confirm-btn">部屋を作成</button>
@@ -921,6 +925,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   const state = {
     mode: "countdown",
     quizType: "country",
+    hintRevealEnabled: false,
+    hintRevealShown: false,
     region: "all",
     timeLimit: 180,
     timer: null,
@@ -1417,6 +1423,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
 
   let hintPracticeTimer = null;
+  let hintRevealTimer = null;
 
   function onCountryClick(feature, layer){
     if(!state.running) return;
@@ -1450,8 +1457,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     answerInput.focus();
     focusOnFeature(feature, { fit:false });
 
-    // ヒントモード・ボーナスヒント、どっちも入力欄のプレースホルダー(薄い字)で見せるダカラ
+    // ヒントモード・ボーナスヒント・じわじわヒント、全部入力欄のプレースホルダー(薄い字)で見せるダカラ
     clearTimeout(hintPracticeTimer);
+    clearTimeout(hintRevealTimer);
+    state.hintRevealShown = false;
     updateAnswerPlaceholder();
   }
 
@@ -1470,6 +1479,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
           answerInput.placeholder = initial + "◯".repeat(Math.max(0, reading.length - 1));
         }
       }, 5000);
+      return;
+    }
+
+    if(state.hintRevealEnabled){
+      answerInput.placeholder = currentAnswerPlaceholder();
+      scheduleHintReveal(feature);
       return;
     }
 
@@ -1509,6 +1524,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     answerPanel.classList.remove('show');
     document.getElementById('center-marker').classList.remove('show');
     clearTimeout(hintPracticeTimer);
+    clearTimeout(hintRevealTimer);
     answerInput.placeholder = currentAnswerPlaceholder();
     if(state.activeFeature && !state.activeFeature.properties.__correct){
       const layer = layers[state.activeFeature.properties.name_ja];
@@ -1596,8 +1612,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         return;
       }
 
-      // ゲームが続く場合は地理的分散ボーナスを計算するダカラ（ヒントモードはスコアなしダカラ計算しないヨ）
-      const distBonus = state.hintPractice ? 0 : diversityBonusFor(feature);
+      // ゲームが続く場合は地理的分散ボーナスを計算するダカラ（ヒントモード・じわじわヒント使用時はスコアなしダカラ計算しないヨ）
+      const usedHintReveal = state.hintRevealShown;
+      const distBonus = (state.hintPractice || usedHintReveal) ? 0 : diversityBonusFor(feature);
       state.points += distBonus;
       state.answeredFeatures.push(feature);
       const bonusTag = distBonus > 0 ? ("（+" + distBonus + "pt）") : "";
@@ -1613,6 +1630,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
           activateHint(bonusEntry.type);
           showToast(label + " ボーナス！" + HINT_LABELS[bonusEntry.type] + "ヒント発動ダカラ！" + bonusTag);
         }
+      } else if(usedHintReveal){
+        showToast(label + " 正解！（ヒントを見たから得点はナシダカラ）");
       } else {
         showToast(label + " 正解！" + bonusTag);
       }
@@ -1878,6 +1897,44 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     return (nameJa && KANJI_READING_HINT[nameJa]) || nameJa || '';
   }
 
+  // 首都名も漢字始まりのモノ（東京・北京・平壌・台北等）は、CAPITAL_DATAのaliasesに入ってる
+  // カタカナ読みをヒント表示用に使うダカラ
+  function hintReadingForCapital(nameJa){
+    const cap = CAPITAL_DATA[nameJa];
+    if(!cap) return '';
+    if(/[\u4E00-\u9FFF]/.test(cap.name) && cap.aliases){
+      const first = cap.aliases.split(',')[0].trim();
+      if(first) return first;
+    }
+    return cap.name;
+  }
+
+  // 今のクイズ種別（国名/首都名）に応じて、ヒント表示用の読みを返すダカラ
+  function currentHintReading(feature){
+    return state.quizType === 'capital'
+      ? hintReadingForCapital(feature.properties.name_ja)
+      : hintReadingFor(feature.properties.name_ja);
+  }
+
+  // 「国名ヒントあり」：選んでから10秒経つと頭文字＋◯が出て、3秒ごとに1文字ずつ増えていくダカラ。
+  // ヒントが一度でも出たら、正解しても得点にはならないヨ（state.hintRevealShownで判定するダカラ）
+  function scheduleHintReveal(feature){
+    const reading = currentHintReading(feature);
+    if(!reading) return;
+    const total = reading.length;
+    let shown = 0;
+    function tick(){
+      if(state.activeFeature !== feature || answerInput.value) return;
+      shown++;
+      state.hintRevealShown = true;
+      answerInput.placeholder = reading.slice(0, shown) + "◯".repeat(Math.max(0, total - shown));
+      if(shown < total){
+        hintRevealTimer = setTimeout(tick, 3000);
+      }
+    }
+    hintRevealTimer = setTimeout(tick, 10000);
+  }
+
   function hintValueFor(feature, type){
     const p = feature.properties;
     switch(type){
@@ -2114,6 +2171,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.bonusEnabled = isHintPractice ? false : document.getElementById('bonus-toggle').checked;
     state.bonusSet = [];
     state.flagMode = document.getElementById('flagmode-toggle').checked;
+    // 「国名ヒントあり」：時間経過でじわじわヒントが出る仕組み。中身はコレから実装スル予定ダカラ、
+    // 今はチェック状態を読み込むダケ（まだ何も起きないヨ）
+    state.hintRevealEnabled = isHintPractice ? false : document.getElementById('hint-reveal-toggle').checked;
     state.maskOtherFlags = false;
     state.points = 0;
     state.answeredFeatures = [];

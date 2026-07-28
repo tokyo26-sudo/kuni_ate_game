@@ -410,7 +410,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.54</span>
+      <span class="sub mono" id="version-tag">v1.55</span>
     </div>
   </header>
 
@@ -504,6 +504,12 @@
             <select id="time-select">
               <option value="180" selected>3分</option>
               <option value="300">5分</option>
+            </select>
+          </div>
+          <div class="overlay-card-row">
+            <select id="quiztype-select">
+              <option value="country" selected>国名で答える</option>
+              <option value="capital">首都名で答える</option>
             </select>
           </div>
         </div>
@@ -670,6 +676,207 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 (function(){
   "use strict";
 
+  const CAPITAL_DATA = {
+    "インド": { name: "ニューデリー", aliases: "", lat: 28.61, lng: 77.21 },
+    "インドネシア": { name: "ジャカルタ", aliases: "", lat: -6.21, lng: 106.85 },
+    "ウズベキスタン": { name: "タシケント", aliases: "", lat: 41.3, lng: 69.24 },
+    "カザフスタン": { name: "アスタナ", aliases: "ヌルスルタン", lat: 51.18, lng: 71.45 },
+    "カンボジア": { name: "プノンペン", aliases: "", lat: 11.56, lng: 104.92 },
+    "キルギス": { name: "ビシュケク", aliases: "", lat: 42.87, lng: 74.59 },
+    "シンガポール": { name: "シンガポール", aliases: "", lat: 1.35, lng: 103.82 },
+    "スリランカ": { name: "スリジャヤワルダナプラコッテ", aliases: "コッテ, コロンボ", lat: 6.89, lng: 79.9 },
+    "タイ": { name: "バンコク", aliases: "", lat: 13.75, lng: 100.5 },
+    "タジキスタン": { name: "ドゥシャンベ", aliases: "", lat: 38.54, lng: 68.78 },
+    "トルクメニスタン": { name: "アシガバット", aliases: "", lat: 37.95, lng: 58.38 },
+    "ネパール": { name: "カトマンズ", aliases: "", lat: 27.72, lng: 85.32 },
+    "バングラデシュ": { name: "ダッカ", aliases: "", lat: 23.81, lng: 90.41 },
+    "パキスタン": { name: "イスラマバード", aliases: "", lat: 33.68, lng: 73.05 },
+    "フィリピン": { name: "マニラ", aliases: "", lat: 14.6, lng: 120.98 },
+    "ブルネイ": { name: "バンダルスリブガワン", aliases: "", lat: 4.94, lng: 114.94 },
+    "ブータン": { name: "ティンプー", aliases: "", lat: 27.47, lng: 89.64 },
+    "ベトナム": { name: "ハノイ", aliases: "", lat: 21.03, lng: 105.85 },
+    "マレーシア": { name: "クアラルンプール", aliases: "", lat: 3.14, lng: 101.69 },
+    "ミャンマー": { name: "ネピドー", aliases: "", lat: 19.76, lng: 96.08 },
+    "モルディブ": { name: "マレ", aliases: "", lat: 4.17, lng: 73.51 },
+    "モンゴル": { name: "ウランバートル", aliases: "", lat: 47.92, lng: 106.92 },
+    "ラオス": { name: "ビエンチャン", aliases: "", lat: 17.97, lng: 102.6 },
+    "中国": { name: "北京", aliases: "ペキン", lat: 39.9, lng: 116.41 },
+    "北朝鮮": { name: "平壌", aliases: "ピョンヤン", lat: 39.02, lng: 125.75 },
+    "台湾": { name: "台北", aliases: "タイペイ", lat: 25.03, lng: 121.56 },
+    "日本": { name: "東京", aliases: "トウキョウ", lat: 35.68, lng: 139.65 },
+    "東ティモール": { name: "ディリ", aliases: "", lat: -8.56, lng: 125.57 },
+    "韓国": { name: "ソウル", aliases: "", lat: 37.57, lng: 126.98 },
+    "オーストラリア": { name: "キャンベラ", aliases: "", lat: -35.28, lng: 149.13 },
+    "キリバス": { name: "タラワ", aliases: "南タラワ", lat: 1.33, lng: 172.98 },
+    "サモア": { name: "アピア", aliases: "", lat: -13.83, lng: -171.76 },
+    "ソロモン諸島": { name: "ホニアラ", aliases: "", lat: -9.43, lng: 159.95 },
+    "ツバル": { name: "フナフティ", aliases: "", lat: -8.52, lng: 179.2 },
+    "トンガ": { name: "ヌクアロファ", aliases: "", lat: -21.14, lng: -175.2 },
+    "ナウル": { name: "ヤレン", aliases: "", lat: -0.55, lng: 166.92 },
+    "ニュージーランド": { name: "ウェリントン", aliases: "", lat: -41.29, lng: 174.78 },
+    "バヌアツ": { name: "ポートビラ", aliases: "", lat: -17.73, lng: 168.32 },
+    "パプアニューギニア": { name: "ポートモレスビー", aliases: "", lat: -9.44, lng: 147.18 },
+    "パラオ": { name: "マルキョク", aliases: "ンゲルルムド", lat: 7.5, lng: 134.62 },
+    "フィジー": { name: "スバ", aliases: "", lat: -18.14, lng: 178.44 },
+    "マーシャル諸島": { name: "マジュロ", aliases: "", lat: 7.1, lng: 171.38 },
+    "ミクロネシア": { name: "パリキール", aliases: "", lat: 6.92, lng: 158.16 },
+    "アメリカ": { name: "ワシントンD.C.", aliases: "ワシントン", lat: 38.9, lng: -77.04 },
+    "カナダ": { name: "オタワ", aliases: "", lat: 45.42, lng: -75.7 },
+    "アルゼンチン": { name: "ブエノスアイレス", aliases: "", lat: -34.6, lng: -58.38 },
+    "アンティグア・バーブーダ": { name: "セントジョンズ", aliases: "", lat: 17.12, lng: -61.85 },
+    "ウルグアイ": { name: "モンテビデオ", aliases: "", lat: -34.9, lng: -56.19 },
+    "エクアドル": { name: "キト", aliases: "", lat: -0.23, lng: -78.52 },
+    "エルサルバドル": { name: "サンサルバドル", aliases: "", lat: 13.69, lng: -89.22 },
+    "ガイアナ": { name: "ジョージタウン", aliases: "", lat: 6.8, lng: -58.16 },
+    "キューバ": { name: "ハバナ", aliases: "", lat: 23.13, lng: -82.38 },
+    "グアテマラ": { name: "グアテマラシティ", aliases: "", lat: 14.63, lng: -90.51 },
+    "グレナダ": { name: "セントジョージズ", aliases: "", lat: 12.05, lng: -61.75 },
+    "コスタリカ": { name: "サンホセ", aliases: "", lat: 9.93, lng: -84.08 },
+    "コロンビア": { name: "ボゴタ", aliases: "", lat: 4.71, lng: -74.07 },
+    "ジャマイカ": { name: "キングストン", aliases: "", lat: 17.97, lng: -76.79 },
+    "スリナム": { name: "パラマリボ", aliases: "", lat: 5.87, lng: -55.17 },
+    "セントクリストファー・ネービス": { name: "バセテール", aliases: "", lat: 17.3, lng: -62.73 },
+    "セントビンセント及びグレナディーン諸島": { name: "キングスタウン", aliases: "", lat: 13.16, lng: -61.22 },
+    "セントルシア": { name: "カストリーズ", aliases: "", lat: 14.01, lng: -60.99 },
+    "チリ": { name: "サンティアゴ", aliases: "", lat: -33.45, lng: -70.67 },
+    "トリニダード・トバゴ": { name: "ポートオブスペイン", aliases: "", lat: 10.65, lng: -61.52 },
+    "ドミニカ共和国": { name: "サントドミンゴ", aliases: "", lat: 18.49, lng: -69.93 },
+    "ドミニカ国": { name: "ロゾー", aliases: "", lat: 15.3, lng: -61.39 },
+    "ニカラグア": { name: "マナグア", aliases: "", lat: 12.15, lng: -86.27 },
+    "ハイチ": { name: "ポルトープランス", aliases: "", lat: 18.59, lng: -72.31 },
+    "バハマ": { name: "ナッソー", aliases: "", lat: 25.06, lng: -77.34 },
+    "バルバドス": { name: "ブリッジタウン", aliases: "", lat: 13.1, lng: -59.62 },
+    "パナマ": { name: "パナマシティ", aliases: "", lat: 8.99, lng: -79.52 },
+    "パラグアイ": { name: "アスンシオン", aliases: "", lat: -25.3, lng: -57.64 },
+    "ブラジル": { name: "ブラジリア", aliases: "", lat: -15.79, lng: -47.88 },
+    "ベネズエラ": { name: "カラカス", aliases: "", lat: 10.49, lng: -66.88 },
+    "ベリーズ": { name: "ベルモパン", aliases: "", lat: 17.25, lng: -88.77 },
+    "ペルー": { name: "リマ", aliases: "", lat: -12.05, lng: -77.04 },
+    "ホンジュラス": { name: "テグシガルパ", aliases: "", lat: 14.1, lng: -87.22 },
+    "ボリビア": { name: "スクレ", aliases: "ラパス", lat: -16.5, lng: -68.15 },
+    "メキシコ": { name: "メキシコシティ", aliases: "", lat: 19.43, lng: -99.13 },
+    "アイスランド": { name: "レイキャビク", aliases: "", lat: 64.15, lng: -21.94 },
+    "アイルランド": { name: "ダブリン", aliases: "", lat: 53.35, lng: -6.26 },
+    "アルバニア": { name: "ティラナ", aliases: "", lat: 41.33, lng: 19.82 },
+    "アンドラ": { name: "アンドラ・ラ・ベリャ", aliases: "", lat: 42.51, lng: 1.52 },
+    "イギリス": { name: "ロンドン", aliases: "", lat: 51.51, lng: -0.13 },
+    "イタリア": { name: "ローマ", aliases: "", lat: 41.9, lng: 12.5 },
+    "ウクライナ": { name: "キーウ", aliases: "キエフ", lat: 50.45, lng: 30.52 },
+    "エストニア": { name: "タリン", aliases: "", lat: 59.44, lng: 24.75 },
+    "オランダ": { name: "アムステルダム", aliases: "ハーグ", lat: 52.37, lng: 4.9 },
+    "オーストリア": { name: "ウィーン", aliases: "", lat: 48.21, lng: 16.37 },
+    "キプロス": { name: "ニコシア", aliases: "", lat: 35.17, lng: 33.36 },
+    "ギリシャ": { name: "アテネ", aliases: "", lat: 37.98, lng: 23.73 },
+    "クロアチア": { name: "ザグレブ", aliases: "", lat: 45.81, lng: 15.98 },
+    "サンマリノ": { name: "サンマリノ", aliases: "", lat: 43.94, lng: 12.45 },
+    "ジョージア": { name: "トビリシ", aliases: "", lat: 41.72, lng: 44.79 },
+    "スイス": { name: "ベルン", aliases: "", lat: 46.95, lng: 7.45 },
+    "スウェーデン": { name: "ストックホルム", aliases: "", lat: 59.33, lng: 18.07 },
+    "スペイン": { name: "マドリード", aliases: "", lat: 40.42, lng: -3.7 },
+    "スロバキア": { name: "ブラチスラバ", aliases: "", lat: 48.15, lng: 17.11 },
+    "スロベニア": { name: "リュブリャナ", aliases: "", lat: 46.06, lng: 14.51 },
+    "セルビア": { name: "ベオグラード", aliases: "", lat: 44.79, lng: 20.45 },
+    "チェコ": { name: "プラハ", aliases: "", lat: 50.09, lng: 14.42 },
+    "デンマーク": { name: "コペンハーゲン", aliases: "", lat: 55.68, lng: 12.57 },
+    "ドイツ": { name: "ベルリン", aliases: "", lat: 52.52, lng: 13.4 },
+    "ノルウェー": { name: "オスロ", aliases: "", lat: 59.91, lng: 10.75 },
+    "ハンガリー": { name: "ブダペスト", aliases: "", lat: 47.5, lng: 19.04 },
+    "バチカン": { name: "バチカン", aliases: "", lat: 41.9, lng: 12.45 },
+    "フィンランド": { name: "ヘルシンキ", aliases: "", lat: 60.17, lng: 24.94 },
+    "フランス": { name: "パリ", aliases: "", lat: 48.85, lng: 2.35 },
+    "ブルガリア": { name: "ソフィア", aliases: "", lat: 42.7, lng: 23.32 },
+    "ベラルーシ": { name: "ミンスク", aliases: "", lat: 53.9, lng: 27.57 },
+    "ベルギー": { name: "ブリュッセル", aliases: "", lat: 50.85, lng: 4.35 },
+    "ボスニア・ヘルツェゴビナ": { name: "サラエボ", aliases: "", lat: 43.86, lng: 18.41 },
+    "ポルトガル": { name: "リスボン", aliases: "", lat: 38.72, lng: -9.14 },
+    "ポーランド": { name: "ワルシャワ", aliases: "", lat: 52.23, lng: 21.01 },
+    "マルタ": { name: "バレッタ", aliases: "", lat: 35.9, lng: 14.51 },
+    "モナコ": { name: "モナコ", aliases: "", lat: 43.73, lng: 7.42 },
+    "モルドバ": { name: "キシナウ", aliases: "", lat: 47.01, lng: 28.86 },
+    "モンテネグロ": { name: "ポドゴリツァ", aliases: "", lat: 42.44, lng: 19.26 },
+    "ラトビア": { name: "リガ", aliases: "", lat: 56.95, lng: 24.11 },
+    "リトアニア": { name: "ビリニュス", aliases: "", lat: 54.69, lng: 25.28 },
+    "リヒテンシュタイン": { name: "ファドゥーツ", aliases: "", lat: 47.14, lng: 9.52 },
+    "ルクセンブルク": { name: "ルクセンブルク", aliases: "", lat: 49.61, lng: 6.13 },
+    "ルーマニア": { name: "ブカレスト", aliases: "", lat: 44.43, lng: 26.1 },
+    "ロシア": { name: "モスクワ", aliases: "", lat: 55.75, lng: 37.62 },
+    "北マケドニア": { name: "スコピエ", aliases: "", lat: 42.0, lng: 21.43 },
+    "アフガニスタン": { name: "カブール", aliases: "", lat: 34.56, lng: 69.21 },
+    "アラブ首長国連邦": { name: "アブダビ", aliases: "", lat: 24.45, lng: 54.38 },
+    "イエメン": { name: "サナア", aliases: "", lat: 15.37, lng: 44.19 },
+    "イスラエル": { name: "エルサレム", aliases: "テルアビブ", lat: 31.77, lng: 35.21 },
+    "イラク": { name: "バグダッド", aliases: "", lat: 33.31, lng: 44.36 },
+    "イラン": { name: "テヘラン", aliases: "", lat: 35.69, lng: 51.39 },
+    "オマーン": { name: "マスカット", aliases: "", lat: 23.61, lng: 58.59 },
+    "カタール": { name: "ドーハ", aliases: "", lat: 25.29, lng: 51.53 },
+    "クウェート": { name: "クウェートシティ", aliases: "", lat: 29.38, lng: 47.99 },
+    "サウジアラビア": { name: "リヤド", aliases: "", lat: 24.71, lng: 46.68 },
+    "シリア": { name: "ダマスカス", aliases: "", lat: 33.51, lng: 36.28 },
+    "トルコ": { name: "アンカラ", aliases: "", lat: 39.93, lng: 32.86 },
+    "バーレーン": { name: "マナーマ", aliases: "", lat: 26.23, lng: 50.59 },
+    "パレスチナ": { name: "ラマッラー", aliases: "東エルサレム", lat: 31.9, lng: 35.2 },
+    "ヨルダン": { name: "アンマン", aliases: "", lat: 31.95, lng: 35.93 },
+    "レバノン": { name: "ベイルート", aliases: "", lat: 33.89, lng: 35.5 },
+    "アルジェリア": { name: "アルジェ", aliases: "", lat: 36.75, lng: 3.06 },
+    "アンゴラ": { name: "ルアンダ", aliases: "", lat: -8.84, lng: 13.23 },
+    "ウガンダ": { name: "カンパラ", aliases: "", lat: 0.31, lng: 32.58 },
+    "エジプト": { name: "カイロ", aliases: "", lat: 30.04, lng: 31.24 },
+    "エスワティニ": { name: "ムババーネ", aliases: "ロバンバ", lat: -26.32, lng: 31.13 },
+    "エチオピア": { name: "アディスアベバ", aliases: "", lat: 9.03, lng: 38.74 },
+    "エリトリア": { name: "アスマラ", aliases: "", lat: 15.32, lng: 38.93 },
+    "カメルーン": { name: "ヤウンデ", aliases: "", lat: 3.87, lng: 11.52 },
+    "カーボベルデ": { name: "プライア", aliases: "", lat: 14.93, lng: -23.51 },
+    "ガボン": { name: "リーブルビル", aliases: "", lat: 0.39, lng: 9.45 },
+    "ガンビア": { name: "バンジュール", aliases: "", lat: 13.45, lng: -16.58 },
+    "ガーナ": { name: "アクラ", aliases: "", lat: 5.6, lng: -0.19 },
+    "ギニア": { name: "コナクリ", aliases: "", lat: 9.51, lng: -13.71 },
+    "ギニアビサウ": { name: "ビサウ", aliases: "", lat: 11.86, lng: -15.6 },
+    "ケニア": { name: "ナイロビ", aliases: "", lat: -1.29, lng: 36.82 },
+    "コモロ": { name: "モロニ", aliases: "", lat: -11.7, lng: 43.26 },
+    "コンゴ共和国": { name: "ブラザビル", aliases: "", lat: -4.26, lng: 15.28 },
+    "コンゴ民主共和国": { name: "キンシャサ", aliases: "", lat: -4.44, lng: 15.27 },
+    "コートジボワール": { name: "ヤムスクロ", aliases: "アビジャン", lat: 6.82, lng: -5.28 },
+    "サントメ・プリンシペ": { name: "サントメ", aliases: "", lat: 0.34, lng: 6.73 },
+    "ザンビア": { name: "ルサカ", aliases: "", lat: -15.39, lng: 28.32 },
+    "シエラレオネ": { name: "フリータウン", aliases: "", lat: 8.48, lng: -13.23 },
+    "ジブチ": { name: "ジブチ", aliases: "", lat: 11.59, lng: 43.15 },
+    "ジンバブエ": { name: "ハラレ", aliases: "", lat: -17.83, lng: 31.05 },
+    "スーダン": { name: "ハルツーム", aliases: "", lat: 15.5, lng: 32.56 },
+    "セネガル": { name: "ダカール", aliases: "", lat: 14.72, lng: -17.47 },
+    "セーシェル": { name: "ビクトリア", aliases: "", lat: -4.62, lng: 55.45 },
+    "ソマリア": { name: "モガディシュ", aliases: "", lat: 2.05, lng: 45.32 },
+    "タンザニア": { name: "ドドマ", aliases: "ダルエスサラーム", lat: -6.16, lng: 35.75 },
+    "チャド": { name: "ンジャメナ", aliases: "", lat: 12.13, lng: 15.06 },
+    "チュニジア": { name: "チュニス", aliases: "", lat: 36.81, lng: 10.18 },
+    "トーゴ": { name: "ロメ", aliases: "", lat: 6.13, lng: 1.22 },
+    "ナイジェリア": { name: "アブジャ", aliases: "", lat: 9.08, lng: 7.4 },
+    "ナミビア": { name: "ウィントフック", aliases: "", lat: -22.56, lng: 17.08 },
+    "ニジェール": { name: "ニアメ", aliases: "", lat: 13.51, lng: 2.11 },
+    "ブルキナファソ": { name: "ワガドゥグー", aliases: "", lat: 12.37, lng: -1.52 },
+    "ブルンジ": { name: "ギテガ", aliases: "ブジュンブラ", lat: -3.43, lng: 29.93 },
+    "ベナン": { name: "ポルトノボ", aliases: "コトヌー", lat: 6.5, lng: 2.6 },
+    "ボツワナ": { name: "ハボローネ", aliases: "", lat: -24.66, lng: 25.91 },
+    "マダガスカル": { name: "アンタナナリボ", aliases: "", lat: -18.88, lng: 47.51 },
+    "マラウイ": { name: "リロングウェ", aliases: "", lat: -13.96, lng: 33.79 },
+    "マリ": { name: "バマコ", aliases: "", lat: 12.65, lng: -8.0 },
+    "モザンビーク": { name: "マプト", aliases: "", lat: -25.97, lng: 32.57 },
+    "モロッコ": { name: "ラバト", aliases: "", lat: 34.02, lng: -6.83 },
+    "モーリシャス": { name: "ポートルイス", aliases: "", lat: -20.16, lng: 57.5 },
+    "モーリタニア": { name: "ヌアクショット", aliases: "", lat: 18.09, lng: -15.98 },
+    "リビア": { name: "トリポリ", aliases: "", lat: 32.89, lng: 13.19 },
+    "リベリア": { name: "モンロビア", aliases: "", lat: 6.3, lng: -10.8 },
+    "ルワンダ": { name: "キガリ", aliases: "", lat: -1.94, lng: 30.06 },
+    "レソト": { name: "マセル", aliases: "", lat: -29.31, lng: 27.48 },
+    "中央アフリカ": { name: "バンギ", aliases: "", lat: 4.37, lng: 18.56 },
+    "南アフリカ": { name: "プレトリア", aliases: "ケープタウン, ブルームフォンテーン", lat: -25.75, lng: 28.19 },
+    "南スーダン": { name: "ジュバ", aliases: "", lat: 4.85, lng: 31.58 },
+    "西サハラ": { name: "ラユーン", aliases: "", lat: 27.15, lng: -13.2 },
+    "赤道ギニア": { name: "マラボ", aliases: "", lat: 3.75, lng: 8.78 },
+    "アゼルバイジャン": { name: "バクー", aliases: "", lat: 40.41, lng: 49.87 },
+    "アルメニア": { name: "エレバン", aliases: "", lat: 40.18, lng: 44.51 },
+    "コソボ": { name: "プリシュティナ", aliases: "", lat: 42.66, lng: 21.17 },
+  };
+
   // ---------- normalize ----------
   function normalize(s){
     if(!s) return "";
@@ -684,6 +891,17 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function answerSet(props){
     const set = new Set();
+    if(state.quizType === 'capital'){
+      // 首都当てモードダカラ、首都の名前（＋読み違いの吸収）だけを正解にするヨ
+      const cap = CAPITAL_DATA[props.name_ja];
+      if(cap){
+        if(cap.name) set.add(normalize(cap.name));
+        if(cap.aliases){
+          cap.aliases.split(",").forEach(a => { const n = normalize(a); if(n) set.add(n); });
+        }
+      }
+      return set;
+    }
     [props.name_ja, props.name_formal_ja, props.name_en, props.name_en2, props.name_ko, props.name_zh]
       .forEach(v => { if(v) set.add(normalize(v)); });
     if(props.aliases_ja){
@@ -702,6 +920,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // ---------- state ----------
   const state = {
     mode: "countdown",
+    quizType: "country",
     region: "all",
     timeLimit: 180,
     timer: null,
@@ -1174,7 +1393,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   let skipNextOutsideClose = false;
 
-  const DEFAULT_ANSWER_PLACEHOLDER = "選んだ国の名前（通称）を入れてね";
+  function currentAnswerPlaceholder(){
+    return state.quizType === 'capital'
+      ? "選んだ国の首都の名前を入れてね"
+      : "選んだ国の名前（通称）を入れてね";
+  }
 
   // ---------- 国旗図鑑（正解した国を永続的に記録するダカラ） ----------
   const FLAG_COLLECTION_KEY = 'kuniAteGame_flagCollection';
@@ -1236,7 +1459,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // ヒントモード（文字数→頭文字の段階表示）と、ボーナス発動中のヒント(頭文字/中国語/韓国語/英語/国旗)、両方コレで出すヨ
   function updateAnswerPlaceholder(){
     const feature = state.activeFeature;
-    if(!feature){ answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER; return; }
+    if(!feature){ answerInput.placeholder = currentAnswerPlaceholder(); return; }
 
     if(state.hintPractice){
       const reading = hintReadingFor(feature.properties.name_ja);
@@ -1264,7 +1487,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       }
     }
 
-    answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER;
+    answerInput.placeholder = currentAnswerPlaceholder();
   }
 
   // 今どの国を選んでるか、国旗ヒントの表示にも枠線で分かるようにするダカラ
@@ -1286,7 +1509,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     answerPanel.classList.remove('show');
     document.getElementById('center-marker').classList.remove('show');
     clearTimeout(hintPracticeTimer);
-    answerInput.placeholder = DEFAULT_ANSWER_PLACEHOLDER;
+    answerInput.placeholder = currentAnswerPlaceholder();
     if(state.activeFeature && !state.activeFeature.properties.__correct){
       const layer = layers[state.activeFeature.properties.name_ja];
       const marker = smallMarkers[state.activeFeature.properties.name_ja];
@@ -1869,6 +2092,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function startGame(){
     state.mode = document.getElementById('mode-select').value;
+    state.quizType = document.getElementById('quiztype-select').value;
     state.region = document.getElementById('region-select').value;
     state.timeLimit = parseInt(document.getElementById('time-select').value, 10);
     state.correctCount = 0;
@@ -2616,6 +2840,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function vsApplyRuleSettings(settings){
     state.region = settings.region || "all";
     state.mode = settings.mode || "countdown";
+    state.quizType = "country"; // 対戦モードは今のところ国名当てのみ対応ダカラ
     state.timeLimit = settings.timeLimit || 180;
     state.dobonEnabled = !!settings.dobonEnabled;
     state.dobonMode = settings.dobonMode || 'penalty';

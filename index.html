@@ -447,7 +447,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.69</span>
+      <span class="sub mono" id="version-tag">v1.70</span>
     </div>
   </header>
 
@@ -1755,6 +1755,15 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(/[ \u3000]/.test(answerInput.value)){
       answerInput.value = answerInput.value.replace(/[ \u3000]/g, '');
       selectFeatureByKeyboard(findRandomFar());
+      return;
+    }
+    // 「じわじわヒントあり」：何か入力してる間はカウントを止めて、
+    // 全部消して空になった瞬間からまたカウントし直すダカラ（打っては消してを繰り返しても待たされるように）
+    if(state.hintRevealEnabled && !state.hintPractice && state.activeFeature){
+      clearTimeout(hintRevealTimer);
+      if(!answerInput.value){
+        scheduleHintReveal(state.activeFeature);
+      }
     }
   });
 

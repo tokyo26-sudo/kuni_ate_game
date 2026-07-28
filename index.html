@@ -410,7 +410,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.58</span>
+      <span class="sub mono" id="version-tag">v1.59</span>
     </div>
   </header>
 
@@ -926,7 +926,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     mode: "countdown",
     quizType: "country",
     hintRevealEnabled: false,
-    hintRevealShown: false,
     region: "all",
     timeLimit: 180,
     timer: null,
@@ -1460,7 +1459,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     // ヒントモード・ボーナスヒント・じわじわヒント、全部入力欄のプレースホルダー(薄い字)で見せるダカラ
     clearTimeout(hintPracticeTimer);
     clearTimeout(hintRevealTimer);
-    state.hintRevealShown = false;
     updateAnswerPlaceholder();
   }
 
@@ -1613,7 +1611,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       }
 
       // ゲームが続く場合は地理的分散ボーナスを計算するダカラ（ヒントモード・じわじわヒント使用時はスコアなしダカラ計算しないヨ）
-      const usedHintReveal = state.hintRevealShown;
+      const usedHintReveal = !!feature.properties.__hintUsed;
       const distBonus = (state.hintPractice || usedHintReveal) ? 0 : diversityBonusFor(feature);
       state.points += distBonus;
       state.answeredFeatures.push(feature);
@@ -1848,6 +1846,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     clearAllHints();
     COUNTRY_GEOJSON.features.forEach(f => {
       f.properties.__correct = false;
+      f.properties.__hintUsed = false;
+      f.properties.__hintShownChars = 0;
       const layer = layers[f.properties.name_ja];
       if(layer){
         layer.setStyle(styleFor(f, false));
@@ -1916,23 +1916,40 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       : hintReadingFor(feature.properties.name_ja);
   }
 
-  // 「じわじわヒントあり」：選んでから10秒経つと頭文字＋◯が出て、3秒ごとに1文字ずつ増えていくダカラ。
-  // ヒントが一度でも出たら、正解しても得点にはならないヨ（state.hintRevealShownで判定するダカラ）
+  // 「じわじわヒントあり」：選んでから10秒後に頭文字＋◯、その後3秒毎に1文字ずつ増えていくダカラ。
+  // 一度ヒントが出た国は、他の国を選んでからまた選び直しても「見えてた状態」がソノママ続きになるヨ
+  // （コレやらないと、一回ヒント全部見てから他の国選んで戻ってくれば、ヒント無しの正解扱いになっちゃう抜け穴があったカラ）
   function scheduleHintReveal(feature){
     const reading = currentHintReading(feature);
     if(!reading) return;
     const total = reading.length;
-    let shown = 0;
+    const props = feature.properties;
+    if(typeof props.__hintShownChars !== 'number') props.__hintShownChars = 0;
+
+    function render(){
+      if(state.activeFeature !== feature || answerInput.value) return;
+      answerInput.placeholder = reading.slice(0, props.__hintShownChars) + "◯".repeat(Math.max(0, total - props.__hintShownChars));
+    }
+
     function tick(){
       if(state.activeFeature !== feature || answerInput.value) return;
-      shown++;
-      state.hintRevealShown = true;
-      answerInput.placeholder = reading.slice(0, shown) + "◯".repeat(Math.max(0, total - shown));
-      if(shown < total){
+      props.__hintShownChars++;
+      props.__hintUsed = true;
+      render();
+      if(props.__hintShownChars < total){
         hintRevealTimer = setTimeout(tick, 3000);
       }
     }
-    hintRevealTimer = setTimeout(tick, 10000);
+
+    if(props.__hintShownChars > 0){
+      // 既にヒントが進んでる国は、続きからソノまま再開するダカラ（最初から10秒待たせないヨ）
+      render();
+      if(props.__hintShownChars < total){
+        hintRevealTimer = setTimeout(tick, 3000);
+      }
+    } else {
+      hintRevealTimer = setTimeout(tick, 10000);
+    }
   }
 
   function hintValueFor(feature, type){
@@ -2365,6 +2382,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     Object.keys(manualTooltips).forEach(name => { map.removeLayer(manualTooltips[name]); delete manualTooltips[name]; });
     COUNTRY_GEOJSON.features.forEach(f => {
       f.properties.__correct = false;
+      f.properties.__hintUsed = false;
+      f.properties.__hintShownChars = 0;
       delete f.properties.__claimedBy;
       const layer = layers[f.properties.name_ja];
       if(layer){ layer.setStyle(styleFor(f, false)); layer.unbindTooltip(); }

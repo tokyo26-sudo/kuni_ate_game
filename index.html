@@ -112,9 +112,10 @@
     display:none; position:absolute; right:16px; top:144px; z-index:10001;
     width:52px; height:52px; border-radius:50%; border:1px solid var(--line);
     background:var(--bg-panel-2); color:var(--ink); font-size:22px; box-shadow:0 8px 20px rgba(0,0,0,0.35);
-    align-items:center; justify-content:center; cursor:pointer;
+    align-items:center; justify-content:center; cursor:pointer; touch-action:none;
   }
   #mobile-mask-btn.active { background:var(--teal); color:#06201c; border-color:var(--teal); }
+  #mobile-mask-btn.dragging { opacity:0.75; box-shadow:0 4px 30px rgba(0,0,0,0.5); }
   @media (max-width: 720px){
     body.playing #mobile-jump-btn { display:flex; }
     body.playing.flagmode-on #mobile-mask-btn { display:flex; }
@@ -192,6 +193,10 @@
     width:56px; height:56px; z-index:9998; pointer-events:none; display:none;
   }
   #center-marker.show { display:block; }
+  @media (max-width: 720px){
+    /* スマホは画面が狭いカラ、選んだ国は地図のセンタリングと国旗の金枠だけで十分見えるダカラ、枠は消すヨ */
+    #center-marker.show { display:none; }
+  }
   #center-marker::before, #center-marker::after,
   #center-marker .cm-tr, #center-marker .cm-bl {
     content:""; position:absolute; width:14px; height:14px;
@@ -442,7 +447,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.68</span>
+      <span class="sub mono" id="version-tag">v1.69</span>
     </div>
   </header>
 
@@ -3280,45 +3285,28 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(!state.running) return;
     endGame(false);
   });
-  document.getElementById('mobile-jump-btn').addEventListener('click', () => {
-    if(!state.running) return;
-    // ドラッグして動かした直後は、ソノクリックだけジャンプ扱いにしないダカラ
-    if(document.getElementById('mobile-jump-btn').dataset.dragMoved === '1'){
-      document.getElementById('mobile-jump-btn').dataset.dragMoved = '0';
-      return;
-    }
-    selectFeatureByKeyboard(findRandomFar());
-  });
-  document.getElementById('mobile-mask-btn').addEventListener('click', () => {
-    if(!state.running || !state.flagMode) return;
-    state.maskOtherFlags = !state.maskOtherFlags;
-    document.getElementById('mobile-mask-btn').classList.toggle('active', state.maskOtherFlags);
-    refreshHintTooltips();
-  });
-
-  // ---------- ジャンプボタンをドラッグで好きな位置に動かせるようにするダカラ ----------
-  (function setupJumpBtnDrag(){
-    const jumpBtn = document.getElementById('mobile-jump-btn');
+  // ---------- スマホの丸ボタンをドラッグで好きな位置に動かせるようにするダカラ ----------
+  function setupDraggableButton(btnId, posKey, onTap){
+    const btn = document.getElementById(btnId);
     const wrap = document.getElementById('map-wrap');
-    const POS_KEY = 'kuniAteGame_jumpBtnPos';
     let dragging = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
 
     function clampAndApply(left, top){
       const wrapRect = wrap.getBoundingClientRect();
-      const size = jumpBtn.offsetWidth || 52;
+      const size = btn.offsetWidth || 52;
       const maxLeft = wrapRect.width - size - 4;
       const maxTop = wrapRect.height - size - 4;
       left = Math.max(4, Math.min(left, maxLeft));
       top = Math.max(4, Math.min(top, maxTop));
-      jumpBtn.style.left = left + 'px';
-      jumpBtn.style.top = top + 'px';
-      jumpBtn.style.right = 'auto';
+      btn.style.left = left + 'px';
+      btn.style.top = top + 'px';
+      btn.style.right = 'auto';
       return { left, top };
     }
 
     function loadSavedPos(){
       try {
-        const raw = localStorage.getItem(POS_KEY);
+        const raw = localStorage.getItem(posKey);
         if(!raw) return;
         const pos = JSON.parse(raw);
         if(typeof pos.left === 'number' && typeof pos.top === 'number'){
@@ -3329,20 +3317,20 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     loadSavedPos();
     window.addEventListener('resize', loadSavedPos);
 
-    jumpBtn.addEventListener('pointerdown', (e) => {
+    btn.addEventListener('pointerdown', (e) => {
       dragging = true; moved = false;
       const wrapRect = wrap.getBoundingClientRect();
-      const btnRect = jumpBtn.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
       startX = e.clientX; startY = e.clientY;
       startLeft = btnRect.left - wrapRect.left;
       startTop = btnRect.top - wrapRect.top;
-      jumpBtn.setPointerCapture(e.pointerId);
+      btn.setPointerCapture(e.pointerId);
     });
-    jumpBtn.addEventListener('pointermove', (e) => {
+    btn.addEventListener('pointermove', (e) => {
       if(!dragging) return;
       const dx = e.clientX - startX, dy = e.clientY - startY;
       if(Math.abs(dx) > 6 || Math.abs(dy) > 6){
-        if(!moved) jumpBtn.classList.add('dragging');
+        if(!moved) btn.classList.add('dragging');
         moved = true;
       }
       if(moved) clampAndApply(startLeft + dx, startTop + dy);
@@ -3350,16 +3338,35 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     function endDrag(){
       if(!dragging) return;
       dragging = false;
-      jumpBtn.classList.remove('dragging');
+      btn.classList.remove('dragging');
       if(moved){
-        jumpBtn.dataset.dragMoved = '1';
-        const pos = { left: parseFloat(jumpBtn.style.left), top: parseFloat(jumpBtn.style.top) };
-        try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch(err){ /* 保存できなくてもゲーム自体は続けられるダカラ */ }
+        btn.dataset.dragMoved = '1';
+        const pos = { left: parseFloat(btn.style.left), top: parseFloat(btn.style.top) };
+        try { localStorage.setItem(posKey, JSON.stringify(pos)); } catch(err){ /* 保存できなくてもゲーム自体は続けられるダカラ */ }
       }
     }
-    jumpBtn.addEventListener('pointerup', endDrag);
-    jumpBtn.addEventListener('pointercancel', endDrag);
-  })();
+    btn.addEventListener('pointerup', endDrag);
+    btn.addEventListener('pointercancel', endDrag);
+
+    btn.addEventListener('click', () => {
+      if(btn.dataset.dragMoved === '1'){
+        btn.dataset.dragMoved = '0';
+        return;
+      }
+      onTap();
+    });
+  }
+
+  setupDraggableButton('mobile-jump-btn', 'kuniAteGame_jumpBtnPos', () => {
+    if(!state.running) return;
+    selectFeatureByKeyboard(findRandomFar());
+  });
+  setupDraggableButton('mobile-mask-btn', 'kuniAteGame_maskBtnPos', () => {
+    if(!state.running || !state.flagMode) return;
+    state.maskOtherFlags = !state.maskOtherFlags;
+    document.getElementById('mobile-mask-btn').classList.toggle('active', state.maskOtherFlags);
+    refreshHintTooltips();
+  });
 
   // ---------- theme toggle ----------
   const themeToggle = document.getElementById('theme-toggle');

@@ -158,6 +158,10 @@
     color:var(--ink); font-size:16px; padding:9px 12px; font-family:inherit;
     outline:none;
   }
+  @media (min-width: 721px){
+    #answer-input { font-size:24px; padding:14px 16px; }
+    #answer-panel button.ctl { font-size:16px; padding:14px 18px; }
+  }
   #answer-input:focus { border-color:var(--gold-dim); }
   #shortcut-hint {
     position:absolute; bottom:-22px; left:50%; transform:translateX(-50%);
@@ -410,7 +414,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.59</span>
+      <span class="sub mono" id="version-tag">v1.60</span>
     </div>
   </header>
 
@@ -1635,6 +1639,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       }
       refreshHintTooltips();
       renderBonusHud();
+      updateScore();
       updatePoints();
       closePanel();
       checkComplete();

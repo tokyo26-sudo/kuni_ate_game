@@ -447,7 +447,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.70</span>
+      <span class="sub mono" id="version-tag">v1.71</span>
     </div>
   </header>
 
@@ -649,7 +649,7 @@
         <h3>💡 ヒント・ルールを設定しよう</h3>
         <ul>
           <li><b>国旗表示モード</b>：地図上に全部の国旗を表示（迷った時の手がかりに）</li>
-          <li><b>じわじわヒントあり</b>：10秒何も入力しないと頭文字＋文字数のヒントが出現、3秒ごとに文字が増えていくヨ。ヒントを見てから正解しても得点にはならないから注意ダカラ！</li>
+          <li><b>じわじわヒントあり</b>：10秒何も入力しないと頭文字＋文字数のヒントが出現、3秒ごとに文字が増えていくヨ。得点は「まだ隠れてる文字の割合」で減っていくダカラ（長い単語の1文字だけならまだ高得点、短い単語で1文字見えたらガクッと下がるヨ。全部見えたら得点ナシダカラ）</li>
           <li><b>ドボンルール</b>：特定の国を踏むと減点（またはアウト）になる、ちょっとしたリスク要素</li>
         </ul>
 
@@ -1697,9 +1697,19 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         return;
       }
 
-      // ゲームが続く場合は地理的分散ボーナスを計算するダカラ（ヒントモード・じわじわヒント使用時はスコアなしダカラ計算しないヨ）
+      // ゲームが続く場合は地理的分散ボーナスを計算するダカラ（ヒントモードはスコアなしダカラ計算しないヨ）
+      // じわじわヒントを見た場合は「まだ隠れてた文字の割合」で得点を按分するヨ
+      // （文字数が多い単語の1文字目はまだ情報量が少ないから高めの割合、短い単語の1文字目はソレだけでほぼ正解バレてるから低めの割合になるダカラ）
       const usedHintReveal = !!feature.properties.__hintUsed;
-      const distBonus = (state.hintPractice || usedHintReveal) ? 0 : diversityBonusFor(feature);
+      const rawBonus = state.hintPractice ? 0 : diversityBonusFor(feature);
+      let hintRatio = 1;
+      if(usedHintReveal){
+        const reading = currentHintReading(feature);
+        const total = reading ? reading.length : 0;
+        const shown = feature.properties.__hintShownChars || 0;
+        hintRatio = total > 0 ? Math.max(0, (total - shown) / total) : 0;
+      }
+      const distBonus = Math.round(rawBonus * hintRatio);
       state.points += distBonus;
       state.answeredFeatures.push(feature);
       const bonusTag = distBonus > 0 ? ("（+" + distBonus + "pt）") : "";
@@ -1715,8 +1725,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
           activateHint(bonusEntry.type);
           showToast(label + " ボーナス！" + HINT_LABELS[bonusEntry.type] + "ヒント発動ダカラ！" + bonusTag);
         }
-      } else if(usedHintReveal){
-        showToast(label + " 正解！（ヒントを見たから得点はナシダカラ）");
       } else {
         showToast(label + " 正解！" + bonusTag);
       }

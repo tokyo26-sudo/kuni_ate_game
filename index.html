@@ -410,7 +410,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.57</span>
+      <span class="sub mono" id="version-tag">v1.58</span>
     </div>
   </header>
 
@@ -498,12 +498,12 @@
           <div class="overlay-card-row">
             <select id="mode-select">
               <option value="countdown">制限時間モード</option>
-              <option value="timeattack">タイムアタック</option>
+              <option value="timeattack">時間無制限</option>
               <option value="hint">ヒントモード（練習用）</option>
             </select>
             <select id="time-select">
               <option value="180" selected>3分</option>
-              <option value="300">5分</option>
+              <option value="600">10分</option>
             </select>
           </div>
           <div class="overlay-card-row">
@@ -522,7 +522,7 @@
           </label>
           <label class="overlay-toggle-row" id="hint-reveal-toggle-label">
             <input type="checkbox" id="hint-reveal-toggle" style="accent-color:var(--teal);">
-            国名ヒントあり
+            じわじわヒントあり
           </label>
           <label class="overlay-toggle-row" id="dobon-toggle-label">
             <input type="checkbox" id="dobon-toggle" style="accent-color:var(--gold);">
@@ -608,11 +608,11 @@
           <select id="vs-region-select"></select>
           <select id="vs-mode-select">
             <option value="countdown" selected>制限時間モード</option>
-            <option value="timeattack">タイムアタック(全部揃うまで)</option>
+            <option value="timeattack">時間無制限(全部揃うまで)</option>
           </select>
           <select id="vs-time-select">
             <option value="180" selected>3分</option>
-            <option value="300">5分</option>
+            <option value="600">10分</option>
           </select>
           <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
             <input type="checkbox" id="vs-dobon-toggle" style="accent-color:var(--gold); width:14px; height:14px;">
@@ -1916,7 +1916,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       : hintReadingFor(feature.properties.name_ja);
   }
 
-  // 「国名ヒントあり」：選んでから10秒経つと頭文字＋◯が出て、3秒ごとに1文字ずつ増えていくダカラ。
+  // 「じわじわヒントあり」：選んでから10秒経つと頭文字＋◯が出て、3秒ごとに1文字ずつ増えていくダカラ。
   // ヒントが一度でも出たら、正解しても得点にはならないヨ（state.hintRevealShownで判定するダカラ）
   function scheduleHintReveal(feature){
     const reading = currentHintReading(feature);
@@ -2171,8 +2171,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.bonusEnabled = isHintPractice ? false : document.getElementById('bonus-toggle').checked;
     state.bonusSet = [];
     state.flagMode = document.getElementById('flagmode-toggle').checked;
-    // 「国名ヒントあり」：時間経過でじわじわヒントが出る仕組み。中身はコレから実装スル予定ダカラ、
-    // 今はチェック状態を読み込むダケ（まだ何も起きないヨ）
+    // 「じわじわヒントあり」：選んでから10秒後に頭文字＋◯、その後3秒毎に1文字ずつ増えるヒント機能ダカラ
     state.hintRevealEnabled = isHintPractice ? false : document.getElementById('hint-reveal-toggle').checked;
     state.maskOtherFlags = false;
     state.points = 0;
@@ -2533,7 +2532,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(!el) return;
     const s = vsState.roomSettings;
     if(!s){ el.textContent = ''; return; }
-    const modeLabel = s.mode === 'timeattack' ? 'タイムアタック(全部揃うまで終了ダカラ)' : '制限時間モード';
+    const modeLabel = s.mode === 'timeattack' ? '時間無制限(全部揃うまで終了ダカラ)' : '制限時間モード';
     const regionLabel = (s.region === 'all' || !s.region) ? '全世界' : s.region;
     const timeLabel = s.mode === 'timeattack' ? '' : (' ・ ' + Math.round((s.timeLimit || 180) / 60) + '分');
     const dobonLabel = s.dobonEnabled ? (' ・ ドボン:' + (s.dobonMode === 'out' ? 'アウト' : '減点')) : '';
@@ -3028,20 +3027,21 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // ヒントモードはスコアなしの練習用ダカラ、ドボン・ボーナスの項目は隠しちゃうネ
   document.getElementById('mode-select').addEventListener('change', e => {
     const isHintPractice = e.target.value === 'hint';
-    ['dobon-toggle-label','bonus-toggle-label'].forEach(id => {
+    ['dobon-toggle-label','bonus-toggle-label','hint-reveal-toggle-label'].forEach(id => {
       document.getElementById(id).style.display = isHintPractice ? 'none' : '';
     });
     if(isHintPractice){
       document.getElementById('dobon-toggle').checked = false;
       document.getElementById('dobon-mode-select').style.display = 'none';
       document.getElementById('bonus-toggle').checked = false;
+      document.getElementById('hint-reveal-toggle').checked = false;
     }
   });
 
   overlayStartBtn.addEventListener('click', startGame);
   rpRetryBtn.addEventListener('click', startGame);
 
-  const MODE_LABELS = { countdown: '制限時間モード', timeattack: 'タイムアタック', hint: 'ヒントモード' };
+  const MODE_LABELS = { countdown: '制限時間モード', timeattack: '時間無制限', hint: 'ヒントモード' };
   document.getElementById('rp-share-btn').addEventListener('click', () => {
     const r = state.lastResult;
     if(!r) return;

@@ -108,8 +108,16 @@
     align-items:center; justify-content:center; cursor:pointer; touch-action:none;
   }
   #mobile-jump-btn.dragging { opacity:0.75; box-shadow:0 4px 30px rgba(0,0,0,0.5); }
+  #mobile-mask-btn {
+    display:none; position:absolute; right:16px; top:144px; z-index:10001;
+    width:52px; height:52px; border-radius:50%; border:1px solid var(--line);
+    background:var(--bg-panel-2); color:var(--ink); font-size:22px; box-shadow:0 8px 20px rgba(0,0,0,0.35);
+    align-items:center; justify-content:center; cursor:pointer;
+  }
+  #mobile-mask-btn.active { background:var(--teal); color:#06201c; border-color:var(--teal); }
   @media (max-width: 720px){
     body.playing #mobile-jump-btn { display:flex; }
+    body.playing.flagmode-on #mobile-mask-btn { display:flex; }
   }
   @media (max-width: 720px){
     #hud {
@@ -339,6 +347,26 @@
     display:none; align-items:center; justify-content:center; padding:20px;
   }
   #gallery-modal.show { display:flex; }
+  #help-modal {
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9990;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  #help-modal.show { display:flex; }
+  #help-modal-box {
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+    padding:24px; max-width:600px; width:100%; max-height:82vh; overflow-y:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,0.5); text-align:left;
+  }
+  #help-modal-box h3 { margin:18px 0 8px; font-size:14px; color:var(--gold-dim); }
+  #help-modal-box h3:first-of-type { margin-top:0; }
+  #help-modal-box ul { margin:0 0 4px; padding-left:20px; }
+  #help-modal-box li { margin:4px 0; font-size:13px; line-height:1.6; }
+  #help-modal-box ol { margin:0 0 4px; padding-left:20px; }
+  #help-modal-box ol li { font-size:13px; line-height:1.6; margin:4px 0; }
+  #help-open-link {
+    background:none; border:none; color:var(--gold-dim); text-decoration:underline;
+    cursor:pointer; font-size:12px; font-family:inherit; padding:0;
+  }
   #gallery-modal-box {
     background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
     padding:20px; max-width:640px; width:100%; max-height:80vh; overflow-y:auto;
@@ -414,13 +442,14 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.60</span>
+      <span class="sub mono" id="version-tag">v1.68</span>
     </div>
   </header>
 
   <div id="map-wrap">
     <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
     <button id="mobile-jump-btn" aria-label="遠くへジャンプ">🚁</button>
+    <button id="mobile-mask-btn" aria-label="他の国旗を隠す">🙈</button>
     <button class="ctl" id="vs-force-end-btn" style="display:none; position:absolute; top:16px; right:110px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">対戦を終了する</button>
     <div id="hud" style="display:none;">
       <div class="stat" id="dobon-status" style="display:none;">
@@ -491,6 +520,7 @@
         地図上の国をクリックして、国名を入力してクダサイ。<br>
         下のメニューでモードと地域、制限時間を選んでからスタートしてクダサイ。
       </div>
+      <button id="help-open-link">📖 遊び方をみる</button>
       <div id="overlay-cards">
         <div class="overlay-card">
           <h3>出題モード</h3>
@@ -581,6 +611,54 @@
         </div>
         <div class="desc" id="gallery-progress-text" style="margin:4px 0 12px;"></div>
         <div id="gallery-grid"></div>
+      </div>
+    </div>
+
+    <div id="help-modal">
+      <div id="help-modal-box">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h2 style="margin:0;">遊び方</h2>
+          <button class="ctl" id="help-close-btn">閉じる</button>
+        </div>
+
+        <h3>🌍 基本の遊び方</h3>
+        <ol>
+          <li>地図に表示された国をクリック（タップ）して選ぼう</li>
+          <li>出てきた入力欄に、選んだ国の名前（または首都名）を入力して「決定」</li>
+          <li>正解すると次の国へ！制限時間内に何ヶ国答えられるかチャレンジしよう</li>
+        </ol>
+
+        <h3>📝 出題モードを選ぼう</h3>
+        <ul>
+          <li><b>国名で答える</b>：地図で選んだ国の名前を入力</li>
+          <li><b>首都名で答える</b>：地図で選んだ国の首都名を入力（読み方が複数ある首都はドッチで答えてもOK！）</li>
+        </ul>
+
+        <h3>⏱️ ゲームモード</h3>
+        <ul>
+          <li><b>制限時間モード</b>：3分 or 10分の中で何ヶ国正解できるかに挑戦</li>
+          <li><b>時間無制限</b>：時間を気にせず、198ヶ国全部答えきることを目指す</li>
+          <li><b>ヒントモード（練習用）</b>：正解の頭文字だけヒント表示。スコアはつかない練習専用モード</li>
+        </ul>
+
+        <h3>💡 ヒント・ルールを設定しよう</h3>
+        <ul>
+          <li><b>国旗表示モード</b>：地図上に全部の国旗を表示（迷った時の手がかりに）</li>
+          <li><b>じわじわヒントあり</b>：10秒何も入力しないと頭文字＋文字数のヒントが出現、3秒ごとに文字が増えていくヨ。ヒントを見てから正解しても得点にはならないから注意ダカラ！</li>
+          <li><b>ドボンルール</b>：特定の国を踏むと減点（またはアウト）になる、ちょっとしたリスク要素</li>
+        </ul>
+
+        <h3>📱 スマホの便利機能</h3>
+        <ul>
+          <li>🚁ボタン：タップで遠くの国へジャンプ（ドラッグで好きな位置に移動できるダカラ）</li>
+          <li>🙈ボタン：国旗表示モード中、他の国旗を一時的に隠せるヨ（国旗表示モードON時のみ表示）</li>
+        </ul>
+
+        <h3>🏳️ 国旗図鑑</h3>
+        <div class="desc" style="font-size:13px;">正解した国の国旗はコレクションされていくダカラ。タイトル画面の「国旗図鑑」から確認・拡大表示も可能ダヨ。</div>
+
+        <h3>⚔️ 対戦モード</h3>
+        <div class="desc" style="font-size:13px;">2人でリアルタイム対戦！部屋を作って合言葉（部屋番号）を共有すれば、友達とスコアを競い合えるダカラ。</div>
       </div>
     </div>
 
@@ -693,7 +771,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "キルギス": { name: "ビシュケク", aliases: "", lat: 42.87, lng: 74.59 },
     "シンガポール": { name: "シンガポール", aliases: "", lat: 1.35, lng: 103.82 },
     "スリランカ": { name: "スリジャヤワルダナプラコッテ", aliases: "コッテ, コロンボ", lat: 6.89, lng: 79.9 },
-    "タイ": { name: "バンコク", aliases: "", lat: 13.75, lng: 100.5 },
+    "タイ": { name: "バンコク", aliases: "クルンテープ・マハナコーン・アモーンラッタナコーシン・マヒンタラーユッタヤー・マハーディロック・ポップ・ノッパラット・ラーチャタニーブリーロム・ウドムラーチャニウェートマハーサターン・アモーンピマーン・アワターンサティット・サッカタッティヤウィサヌカムプラシット, クルンテープマハナコーンアモーンラッタナコーシンマヒンタラーユッタヤーマハーディロックポップノッパラットラーチャタニーブリーロムウドムラーチャニウェートマハーサターンアモーンピマーンアワターンサティットサッカタッティヤウィサヌカムプラシット", lat: 13.75, lng: 100.5 },
     "タジキスタン": { name: "ドゥシャンベ", aliases: "", lat: 38.54, lng: 68.78 },
     "トルクメニスタン": { name: "アシガバット", aliases: "", lat: 37.95, lng: 58.38 },
     "ネパール": { name: "カトマンズ", aliases: "", lat: 27.72, lng: 85.32 },
@@ -704,16 +782,16 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "ブータン": { name: "ティンプー", aliases: "", lat: 27.47, lng: 89.64 },
     "ベトナム": { name: "ハノイ", aliases: "", lat: 21.03, lng: 105.85 },
     "マレーシア": { name: "クアラルンプール", aliases: "", lat: 3.14, lng: 101.69 },
-    "ミャンマー": { name: "ネピドー", aliases: "", lat: 19.76, lng: 96.08 },
+    "ミャンマー": { name: "ネピドー", aliases: "ネーピードー", lat: 19.76, lng: 96.08 },
     "モルディブ": { name: "マレ", aliases: "", lat: 4.17, lng: 73.51 },
     "モンゴル": { name: "ウランバートル", aliases: "", lat: 47.92, lng: 106.92 },
     "ラオス": { name: "ビエンチャン", aliases: "", lat: 17.97, lng: 102.6 },
     "中国": { name: "北京", aliases: "ペキン", lat: 39.9, lng: 116.41 },
     "北朝鮮": { name: "平壌", aliases: "ピョンヤン", lat: 39.02, lng: 125.75 },
     "台湾": { name: "台北", aliases: "タイペイ", lat: 25.03, lng: 121.56 },
-    "日本": { name: "東京", aliases: "トウキョウ", lat: 35.68, lng: 139.65 },
+    "日本": { name: "東京", aliases: "トウキョウ, トウキョウト, 東京都", lat: 35.68, lng: 139.65 },
     "東ティモール": { name: "ディリ", aliases: "", lat: -8.56, lng: 125.57 },
-    "韓国": { name: "ソウル", aliases: "", lat: 37.57, lng: 126.98 },
+    "韓国": { name: "ソウル", aliases: "ソウルトクピョルシ, ソウル特別市", lat: 37.57, lng: 126.98 },
     "オーストラリア": { name: "キャンベラ", aliases: "", lat: -35.28, lng: 149.13 },
     "キリバス": { name: "タラワ", aliases: "南タラワ", lat: 1.33, lng: 172.98 },
     "サモア": { name: "アピア", aliases: "", lat: -13.83, lng: -171.76 },
@@ -728,7 +806,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "フィジー": { name: "スバ", aliases: "", lat: -18.14, lng: 178.44 },
     "マーシャル諸島": { name: "マジュロ", aliases: "", lat: 7.1, lng: 171.38 },
     "ミクロネシア": { name: "パリキール", aliases: "", lat: 6.92, lng: 158.16 },
-    "アメリカ": { name: "ワシントンD.C.", aliases: "ワシントン", lat: 38.9, lng: -77.04 },
+    "アメリカ": { name: "ワシントンD.C.", aliases: "ワシントン, ワシントンディーシー, ワシントンデーシー", lat: 38.9, lng: -77.04 },
     "カナダ": { name: "オタワ", aliases: "", lat: 45.42, lng: -75.7 },
     "アルゼンチン": { name: "ブエノスアイレス", aliases: "", lat: -34.6, lng: -58.38 },
     "アンティグア・バーブーダ": { name: "セントジョンズ", aliases: "", lat: 17.12, lng: -61.85 },
@@ -822,7 +900,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "シリア": { name: "ダマスカス", aliases: "", lat: 33.51, lng: 36.28 },
     "トルコ": { name: "アンカラ", aliases: "", lat: 39.93, lng: 32.86 },
     "バーレーン": { name: "マナーマ", aliases: "", lat: 26.23, lng: 50.59 },
-    "パレスチナ": { name: "ラマッラー", aliases: "東エルサレム", lat: 31.9, lng: 35.2 },
+    "パレスチナ": { name: "ラマッラー", aliases: "東エルサレム, ラーマッラー, ラマラ, ラマッラ", lat: 31.9, lng: 35.2 },
     "ヨルダン": { name: "アンマン", aliases: "", lat: 31.95, lng: 35.93 },
     "レバノン": { name: "ベイルート", aliases: "", lat: 33.89, lng: 35.5 },
     "アルジェリア": { name: "アルジェ", aliases: "", lat: 36.75, lng: 3.06 },
@@ -830,7 +908,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "ウガンダ": { name: "カンパラ", aliases: "", lat: 0.31, lng: 32.58 },
     "エジプト": { name: "カイロ", aliases: "", lat: 30.04, lng: 31.24 },
     "エスワティニ": { name: "ムババーネ", aliases: "ロバンバ", lat: -26.32, lng: 31.13 },
-    "エチオピア": { name: "アディスアベバ", aliases: "", lat: 9.03, lng: 38.74 },
+    "エチオピア": { name: "アディスアベバ", aliases: "アジスアベバ, アディス・アベバ, アジス・アベバ", lat: 9.03, lng: 38.74 },
     "エリトリア": { name: "アスマラ", aliases: "", lat: 15.32, lng: 38.93 },
     "カメルーン": { name: "ヤウンデ", aliases: "", lat: 3.87, lng: 11.52 },
     "カーボベルデ": { name: "プライア", aliases: "", lat: 14.93, lng: -23.51 },
@@ -1761,6 +1839,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(e.key === 'Tab' && state.flagMode){
       e.preventDefault();
       state.maskOtherFlags = !state.maskOtherFlags;
+      document.getElementById('mobile-mask-btn').classList.toggle('active', state.maskOtherFlags);
       refreshHintTooltips();
       return;
     }
@@ -2193,9 +2272,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.bonusEnabled = isHintPractice ? false : document.getElementById('bonus-toggle').checked;
     state.bonusSet = [];
     state.flagMode = document.getElementById('flagmode-toggle').checked;
+    document.body.classList.toggle('flagmode-on', state.flagMode);
     // 「じわじわヒントあり」：選んでから10秒後に頭文字＋◯、その後3秒毎に1文字ずつ増えるヒント機能ダカラ
     state.hintRevealEnabled = isHintPractice ? false : document.getElementById('hint-reveal-toggle').checked;
     state.maskOtherFlags = false;
+    document.getElementById('mobile-mask-btn').classList.remove('active');
     state.points = 0;
     state.answeredFeatures = [];
     state.dobonPointsEarned = 0;
@@ -3148,6 +3229,15 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   document.getElementById('gallery-close-btn').addEventListener('click', () => {
     document.getElementById('gallery-modal').classList.remove('show');
   });
+  document.getElementById('help-open-link').addEventListener('click', () => {
+    document.getElementById('help-modal').classList.add('show');
+  });
+  document.getElementById('help-close-btn').addEventListener('click', () => {
+    document.getElementById('help-modal').classList.remove('show');
+  });
+  document.getElementById('help-modal').addEventListener('click', (e) => {
+    if(e.target.id === 'help-modal') document.getElementById('help-modal').classList.remove('show');
+  });
   document.getElementById('gallery-grid').addEventListener('click', (e) => {
     const item = e.target.closest('.gallery-item');
     if(!item || item.classList.contains('locked')) return;
@@ -3198,6 +3288,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       return;
     }
     selectFeatureByKeyboard(findRandomFar());
+  });
+  document.getElementById('mobile-mask-btn').addEventListener('click', () => {
+    if(!state.running || !state.flagMode) return;
+    state.maskOtherFlags = !state.maskOtherFlags;
+    document.getElementById('mobile-mask-btn').classList.toggle('active', state.maskOtherFlags);
+    refreshHintTooltips();
   });
 
   // ---------- ジャンプボタンをドラッグで好きな位置に動かせるようにするダカラ ----------

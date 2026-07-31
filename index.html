@@ -172,7 +172,7 @@
   body.playing #session-badge-row.has-items { display:flex; gap:6px; align-items:center; }
   #session-badge-row img {
     width:32px; height:32px; flex:none; border-radius:6px;
-    border:1px solid var(--line); object-fit:cover;
+    border:1px solid var(--line); object-fit:contain;
     background:var(--bg-panel-2); box-shadow:0 4px 10px rgba(0,0,0,0.3);
     animation: badgePop .25s ease;
   }
@@ -180,6 +180,9 @@
     0% { transform:scale(0.4); opacity:0; }
     100% { transform:scale(1); opacity:1; }
   }
+  /* 紋章・市章（透明背景）は、コレ単体だと地図の上で見えにくいカラ、白い座布団を敷いてあげるヨ */
+  .badge-emblem { background:#f4f1e8 !important; padding:4px; }
+  .gallery-item img.badge-emblem { padding:6px; box-sizing:border-box; }
   @media (min-width: 721px){
     #session-badge-row { display:none !important; }
   }
@@ -187,7 +190,6 @@
     display:none; position:absolute; z-index:9998;
     top:74px; right:16px; bottom:16px; width:280px;
     overflow-y:auto; overflow-x:hidden;
-    background:rgba(0,0,0,0.18); border-radius:10px 0 0 10px;
     padding:10px; gap:6px;
     grid-template-columns:repeat(auto-fill, 36px);
     align-content:flex-start;
@@ -195,7 +197,7 @@
   body.playing #session-badge-grid.has-items { display:grid; }
   #session-badge-grid img {
     width:36px; height:36px; border-radius:6px;
-    border:1px solid var(--line); object-fit:cover;
+    border:1px solid var(--line); object-fit:contain;
     background:var(--bg-panel-2); box-shadow:0 4px 10px rgba(0,0,0,0.3);
     animation: badgePop .25s ease; cursor:pointer;
   }
@@ -423,7 +425,7 @@
   }
   .gallery-item { display:flex; flex-direction:column; align-items:center; gap:4px; }
   .gallery-item img {
-    width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px; border:1px solid var(--line);
+    width:100%; aspect-ratio:4/3; object-fit:contain; border-radius:4px; border:1px solid var(--line);
     background:var(--bg-deep);
   }
   .gallery-item .locked-box {
@@ -502,7 +504,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.80</span>
+      <span class="sub mono" id="version-tag">v1.83</span>
     </div>
   </header>
 
@@ -1608,6 +1610,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const code = (props.cca2 || '').toLowerCase();
     return code ? ('https://flagcdn.com/' + code + '.svg') : '';
   }
+  // 紋章・市章（透明背景で単体だと見えにくいコトがあるダカラ）かどうかを判定するヨ。
+  // データが無くて国旗で代用してる場合は、旗自体が背景色を持ってるカラ座布団は不要ダヨ
+  function capitalBadgeIsEmblem(props){
+    const entry = (typeof CAPITAL_FLAG_DATA !== 'undefined') ? CAPITAL_FLAG_DATA[props.name_ja] : null;
+    return !!(entry && entry.kind === 'emblem');
+  }
 
   // ---------- 今回のプレイ中に集めたバッジを並べるダカラ ----------
   // （スマホは入力パネルの下に横一列、PCは画面右端に縦グリッドダヨ。国名当てモードなら国旗、首都名当てモードなら首都バッジ）
@@ -1627,15 +1635,18 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const name = state.quizType === 'capital'
       ? ((typeof CAPITAL_DATA !== 'undefined' && CAPITAL_DATA[props.name_ja]) ? CAPITAL_DATA[props.name_ja].name : props.name_ja)
       : props.name_ja;
+    const isEmblem = state.quizType === 'capital' && capitalBadgeIsEmblem(props);
 
     const rowImg = document.createElement('img');
     rowImg.src = url; rowImg.alt = name; rowImg.loading = 'lazy';
+    if(isEmblem) rowImg.classList.add('badge-emblem');
     sessionBadgeRow.appendChild(rowImg);
     sessionBadgeRow.classList.add('has-items');
     sessionBadgeRow.scrollLeft = sessionBadgeRow.scrollWidth;
 
     const gridImg = document.createElement('img');
     gridImg.src = url; gridImg.alt = name; gridImg.title = name; gridImg.loading = 'lazy';
+    if(isEmblem) gridImg.classList.add('badge-emblem');
     gridImg.addEventListener('click', () => {
       document.getElementById('flag-zoom-img').src = url;
       document.getElementById('flag-zoom-img').alt = name;
@@ -3443,11 +3454,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const cap = (typeof CAPITAL_DATA !== 'undefined') ? CAPITAL_DATA[p.name_ja] : null;
       const capName = cap ? cap.name : p.name_ja;
       const badgeUrl = capitalBadgeUrl(p);
+      const emblemClass = capitalBadgeIsEmblem(p) ? ' badge-emblem' : '';
       const nameLabel = isCollected ? capName : '？？？';
       return '<div class="gallery-item' + (isCollected ? '' : ' locked') + '"' +
         (isCollected ? ' data-flag-url="' + badgeUrl + '" data-flag-name="' + capName + '" data-country="' + p.name_ja + '"' : '') + '>' +
         (isCollected
-          ? '<img src="' + badgeUrl + '" alt="' + capName + '" loading="lazy">'
+          ? '<img class="' + emblemClass.trim() + '" src="' + badgeUrl + '" alt="' + capName + '" loading="lazy">'
           : '<div class="locked-box"></div>') +
         '<div class="gallery-name">' + nameLabel + '</div>' +
         '</div>';

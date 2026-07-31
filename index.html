@@ -163,11 +163,11 @@
     letter-spacing:0.08em;
   }
   #answer-input {
-    flex:1; background:var(--bg-deep); border:1px solid var(--line); border-radius:6px;
+    flex:1; min-width:0; background:var(--bg-deep); border:1px solid var(--line); border-radius:6px;
     color:var(--ink); font-size:16px; padding:9px 12px; font-family:inherit;
     outline:none; box-shadow:0 10px 26px rgba(0,0,0,0.4);
   }
-  #answer-panel button.ctl { box-shadow:0 10px 26px rgba(0,0,0,0.4); }
+  #answer-panel button.ctl { box-shadow:0 10px 26px rgba(0,0,0,0.4); flex:none; }
   @media (min-width: 721px){
     #answer-input { font-size:24px; padding:14px 16px; }
     #answer-panel button.ctl { font-size:16px; padding:14px 18px; }
@@ -462,7 +462,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.76</span>
+      <span class="sub mono" id="version-tag">v1.77</span>
     </div>
   </header>
 

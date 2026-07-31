@@ -162,6 +162,46 @@
     font-size:11px; color:var(--ink-dim); position:absolute; top:-22px; left:16px;
     letter-spacing:0.08em;
   }
+  #session-badge-row {
+    display:none; position:absolute; z-index:9998;
+    top:110px; left:12px; right:12px; height:40px;
+    overflow-x:auto; overflow-y:hidden; white-space:nowrap;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  #session-badge-row::-webkit-scrollbar { display:none; }
+  body.playing #session-badge-row.has-items { display:flex; gap:6px; align-items:center; }
+  #session-badge-row img {
+    width:32px; height:32px; flex:none; border-radius:6px;
+    border:1px solid var(--line); object-fit:cover;
+    background:var(--bg-panel-2); box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    animation: badgePop .25s ease;
+  }
+  @keyframes badgePop {
+    0% { transform:scale(0.4); opacity:0; }
+    100% { transform:scale(1); opacity:1; }
+  }
+  @media (min-width: 721px){
+    #session-badge-row { display:none !important; }
+  }
+  #session-badge-grid {
+    display:none; position:absolute; z-index:9998;
+    top:74px; right:16px; bottom:16px; width:280px;
+    overflow-y:auto; overflow-x:hidden;
+    background:rgba(0,0,0,0.18); border-radius:10px 0 0 10px;
+    padding:10px; gap:6px;
+    grid-template-columns:repeat(auto-fill, 36px);
+    align-content:flex-start;
+  }
+  body.playing #session-badge-grid.has-items { display:grid; }
+  #session-badge-grid img {
+    width:36px; height:36px; border-radius:6px;
+    border:1px solid var(--line); object-fit:cover;
+    background:var(--bg-panel-2); box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    animation: badgePop .25s ease; cursor:pointer;
+  }
+  @media (max-width: 720px){
+    #session-badge-grid { display:none !important; }
+  }
   #answer-input {
     flex:1; min-width:0; background:var(--bg-deep); border:1px solid var(--line); border-radius:6px;
     color:var(--ink); font-size:16px; padding:9px 12px; font-family:inherit;
@@ -462,7 +502,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.77</span>
+      <span class="sub mono" id="version-tag">v1.80</span>
     </div>
   </header>
 
@@ -506,6 +546,8 @@
       <button class="ctl" id="submit-btn">決定</button>
       <span id="shortcut-hint">↑↓←→ 方向へ ／ Space 遠くへ ／ Tab 国旗マスク切替 ／ Esc 閉じる</span>
     </div>
+    <div id="session-badge-row"></div>
+    <div id="session-badge-grid"></div>
 
     <div id="result-panel">
       <div class="headline" id="rp-headline"></div>
@@ -1567,6 +1609,46 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     return code ? ('https://flagcdn.com/' + code + '.svg') : '';
   }
 
+  // ---------- 今回のプレイ中に集めたバッジを並べるダカラ ----------
+  // （スマホは入力パネルの下に横一列、PCは画面右端に縦グリッドダヨ。国名当てモードなら国旗、首都名当てモードなら首都バッジ）
+  const sessionBadgeRow = document.getElementById('session-badge-row');
+  const sessionBadgeGrid = document.getElementById('session-badge-grid');
+  function clearSessionBadges(){
+    sessionBadgeRow.innerHTML = '';
+    sessionBadgeRow.classList.remove('has-items');
+    sessionBadgeGrid.innerHTML = '';
+    sessionBadgeGrid.classList.remove('has-items');
+  }
+  function addSessionBadge(props){
+    if(!sessionBadgeRow) return;
+    const code = (props.cca2 || '').toLowerCase();
+    const url = state.quizType === 'capital' ? capitalBadgeUrl(props) : (code ? ('https://flagcdn.com/' + code + '.svg') : '');
+    if(!url) return;
+    const name = state.quizType === 'capital'
+      ? ((typeof CAPITAL_DATA !== 'undefined' && CAPITAL_DATA[props.name_ja]) ? CAPITAL_DATA[props.name_ja].name : props.name_ja)
+      : props.name_ja;
+
+    const rowImg = document.createElement('img');
+    rowImg.src = url; rowImg.alt = name; rowImg.loading = 'lazy';
+    sessionBadgeRow.appendChild(rowImg);
+    sessionBadgeRow.classList.add('has-items');
+    sessionBadgeRow.scrollLeft = sessionBadgeRow.scrollWidth;
+
+    const gridImg = document.createElement('img');
+    gridImg.src = url; gridImg.alt = name; gridImg.title = name; gridImg.loading = 'lazy';
+    gridImg.addEventListener('click', () => {
+      document.getElementById('flag-zoom-img').src = url;
+      document.getElementById('flag-zoom-img').alt = name;
+      document.getElementById('flag-zoom-name').textContent = name;
+      document.getElementById('flag-zoom-sub').textContent = props.name_ja;
+      document.getElementById('flag-zoom-modal').classList.add('show');
+    });
+    sessionBadgeGrid.appendChild(gridImg);
+    sessionBadgeGrid.classList.add('has-items');
+    // 新しいバッジが見える位置まで、一番下にスクロールしとくダカラ
+    sessionBadgeGrid.scrollTop = sessionBadgeGrid.scrollHeight;
+  }
+
   let hintPracticeTimer = null;
   let hintRevealTimer = null;
 
@@ -1733,6 +1815,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       if(state.quizType === 'capital'){
         addToCapitalFlagCollection(feature.properties.name_ja);
       }
+      addSessionBadge(feature.properties);
       refreshAllStyles();
       const flag = flagEmoji(feature.properties.cca2);
       const mainLayer = layers[feature.properties.name_ja];
@@ -2340,6 +2423,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.correctCount = 0;
     state.elapsed = 0;
     state.timeLeft = state.timeLimit;
+    clearSessionBadges();
     state.missed = [];
     // ヒントモードは練習用ダカラ、ドボン・ボーナスは強制的にオフにするヨ
     const isHintPractice = state.mode === 'hint';

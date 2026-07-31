@@ -144,9 +144,8 @@
   /* ---------- Answer panel ---------- */
   #answer-panel {
     position:fixed; left:50%; top:132px; bottom:auto; transform:translate(-50%,-8px) scale(0.94);
-    background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
-    padding:14px 16px; display:flex; gap:10px; align-items:center;
-    box-shadow:0 20px 50px rgba(0,0,0,0.55); transition:transform .18s ease, opacity .18s ease, top .15s ease;
+    display:flex; gap:10px; align-items:center;
+    transition:transform .18s ease, opacity .18s ease, top .15s ease;
     z-index:9999; min-width:320px; opacity:0; pointer-events:none;
   }
   #answer-panel.show { transform:translate(-50%,0) scale(1); opacity:1; pointer-events:auto; }
@@ -166,8 +165,9 @@
   #answer-input {
     flex:1; background:var(--bg-deep); border:1px solid var(--line); border-radius:6px;
     color:var(--ink); font-size:16px; padding:9px 12px; font-family:inherit;
-    outline:none;
+    outline:none; box-shadow:0 10px 26px rgba(0,0,0,0.4);
   }
+  #answer-panel button.ctl { box-shadow:0 10px 26px rgba(0,0,0,0.4); }
   @media (min-width: 721px){
     #answer-input { font-size:24px; padding:14px 16px; }
     #answer-panel button.ctl { font-size:16px; padding:14px 18px; }
@@ -462,7 +462,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.75</span>
+      <span class="sub mono" id="version-tag">v1.76</span>
     </div>
   </header>
 

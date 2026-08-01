@@ -504,7 +504,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.85</span>
+      <span class="sub mono" id="version-tag">v1.89</span>
     </div>
   </header>
 
@@ -595,13 +595,10 @@
           </div>
           <div class="overlay-card-row">
             <select id="mode-select">
-              <option value="countdown">制限時間モード</option>
+              <option value="countdown_180" selected>制限時間: 3分</option>
+              <option value="countdown_600">制限時間: 10分</option>
               <option value="timeattack">時間無制限</option>
-              <option value="hint">ヒントモード（練習用）</option>
-            </select>
-            <select id="time-select">
-              <option value="180" selected>3分</option>
-              <option value="600">10分</option>
+              <option value="hint">ヒントモード（練習用・3分固定）</option>
             </select>
           </div>
           <div class="overlay-card-row">
@@ -715,13 +712,13 @@
         <ul>
           <li><b>制限時間モード</b>：3分 or 10分の中で何ヶ国正解できるかに挑戦</li>
           <li><b>時間無制限</b>：時間を気にせず、198ヶ国全部答えきることを目指す</li>
-          <li><b>ヒントモード（練習用）</b>：正解の頭文字だけヒント表示。スコアはつかない練習専用モード</li>
+          <li><b>ヒントモード（練習用・3分固定）</b>：選んだ瞬間から文字数が◯で見えて、5秒後に頭文字、以降3秒ごとに1文字ずつ増えていくヨ。スコアはつかない練習専用モード</li>
         </ul>
 
         <h3>💡 ヒント・ルールを設定しよう</h3>
         <ul>
           <li><b>国旗表示モード</b>：地図上に全部の国旗を表示（迷った時の手がかりに）</li>
-          <li><b>じわじわヒントあり</b>：10秒何も入力しないと頭文字＋文字数のヒントが出現、3秒ごとに文字が増えていくヨ。得点は「まだ隠れてる文字の割合」で減っていくダカラ（長い単語の1文字だけならまだ高得点、短い単語で1文字見えたらガクッと下がるヨ。全部見えたら得点ナシダカラ）</li>
+          <li><b>じわじわヒントあり</b>：5秒何も入力しないと文字数分の◯が出現、10秒後に頭文字が開いて、以降3秒ごとに1文字ずつ増えていくヨ。得点は「まだ隠れてる文字の割合」で減っていくダカラ（長い単語の1文字だけならまだ高得点、短い単語で1文字見えたらガクッと下がるヨ。全部見えたら得点ナシダカラ）</li>
           <li><b>ドボンルール</b>：特定の国を踏むと減点（またはアウト）になる、ちょっとしたリスク要素</li>
         </ul>
 
@@ -1158,17 +1155,15 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const params = new URLSearchParams(location.search);
     if(!params.has('mode')) return;
     const mode = params.get('mode');
+    const time = params.get('time');
     if(['countdown', 'timeattack', 'hint'].includes(mode)){
-      document.getElementById('mode-select').value = mode;
+      const selectValue = mode === 'countdown' ? ('countdown_' + (time === '600' ? '600' : '180')) : mode;
+      document.getElementById('mode-select').value = selectValue;
       document.getElementById('mode-select').dispatchEvent(new Event('change'));
     }
     const region = params.get('region');
     if(region && [...regionSelect.options].some(o => o.value === region)){
       regionSelect.value = region;
-    }
-    const time = params.get('time');
-    if(time && ['180','300'].includes(time)){
-      document.getElementById('time-select').value = time;
     }
     if(params.get('dobon') === '1'){
       document.getElementById('dobon-toggle').checked = true;
@@ -1661,7 +1656,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     sessionBadgeGrid.scrollTop = sessionBadgeGrid.scrollHeight;
   }
 
-  let hintPracticeTimer = null;
   let hintRevealTimer = null;
 
   function onCountryClick(feature, layer){
@@ -1697,7 +1691,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     focusOnFeature(feature, { fit:false });
 
     // ヒントモード・ボーナスヒント・じわじわヒント、全部入力欄のプレースホルダー(薄い字)で見せるダカラ
-    clearTimeout(hintPracticeTimer);
     clearTimeout(hintRevealTimer);
     updateAnswerPlaceholder();
   }
@@ -1709,14 +1702,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(!feature){ answerInput.placeholder = currentAnswerPlaceholder(); return; }
 
     if(state.hintPractice){
-      const reading = currentHintReading(feature);
-      const initial = reading.charAt(0);
-      answerInput.placeholder = "◯".repeat(reading.length);
-      hintPracticeTimer = setTimeout(() => {
-        if(state.activeFeature === feature && !answerInput.value){
-          answerInput.placeholder = initial + "◯".repeat(Math.max(0, reading.length - 1));
-        }
-      }, 5000);
+      scheduleHintReveal(feature);
       return;
     }
 
@@ -1761,7 +1747,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function closePanel(){
     answerPanel.classList.remove('show');
     document.getElementById('center-marker').classList.remove('show');
-    clearTimeout(hintPracticeTimer);
     clearTimeout(hintRevealTimer);
     answerInput.placeholder = currentAnswerPlaceholder();
     if(state.activeFeature && !state.activeFeature.properties.__correct){
@@ -1922,9 +1907,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       selectFeatureByKeyboard(findRandomFar());
       return;
     }
-    // 「じわじわヒントあり」：何か入力してる間はカウントを止めて、
+    // 「じわじわヒントあり」「ヒントモード（練習用）」：何か入力してる間はカウントを止めて、
     // 全部消して空になった瞬間からまたカウントし直すダカラ（打っては消してを繰り返しても待たされるように）
-    if(state.hintRevealEnabled && !state.hintPractice && state.activeFeature){
+    if((state.hintRevealEnabled || state.hintPractice) && state.activeFeature){
       clearTimeout(hintRevealTimer);
       if(!answerInput.value){
         scheduleHintReveal(state.activeFeature);
@@ -2111,6 +2096,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       f.properties.__correct = false;
       f.properties.__hintUsed = false;
       f.properties.__hintShownChars = 0;
+      f.properties.__hintCirclesShown = false;
       const layer = layers[f.properties.name_ja];
       if(layer){
         layer.setStyle(styleFor(f, false));
@@ -2182,16 +2168,26 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // 「じわじわヒントあり」：選んでから10秒後に頭文字＋◯、その後3秒毎に1文字ずつ増えていくダカラ。
   // 一度ヒントが出た国は、他の国を選んでからまた選び直しても「見えてた状態」がソノママ続きになるヨ
   // （コレやらないと、一回ヒント全部見てから他の国選んで戻ってくれば、ヒント無しの正解扱いになっちゃう抜け穴があったカラ）
+  // 「じわじわヒントあり」と「ヒントモード（練習用）」、両方コレ共通で使うダカラ。
+  // 違いは「文字数の◯」が出るまでの待ち時間だけ（練習用は即0秒、じわじわヒントは5秒）。
+  // ソコから頭文字までは5秒、以降は3秒ごとに1文字ずつ増えてくのは共通ダヨ。
+  // 一度でも進んだ国は、他の国を選んでからまた選び直しても続きから再開するダカラ（抜け穴対策）
   function scheduleHintReveal(feature){
     const reading = currentHintReading(feature);
     if(!reading) return;
     const total = reading.length;
     const props = feature.properties;
     if(typeof props.__hintShownChars !== 'number') props.__hintShownChars = 0;
+    if(typeof props.__hintCirclesShown !== 'boolean') props.__hintCirclesShown = false;
+    const circleDelay = state.hintPractice ? 0 : 5000;
 
     function render(){
       if(state.activeFeature !== feature || answerInput.value) return;
-      answerInput.placeholder = reading.slice(0, props.__hintShownChars) + "◯".repeat(Math.max(0, total - props.__hintShownChars));
+      if(props.__hintShownChars > 0){
+        answerInput.placeholder = reading.slice(0, props.__hintShownChars) + "◯".repeat(Math.max(0, total - props.__hintShownChars));
+      } else {
+        answerInput.placeholder = "◯".repeat(total);
+      }
     }
 
     function tick(){
@@ -2204,14 +2200,25 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       }
     }
 
+    function afterCircles(){
+      if(state.activeFeature !== feature || answerInput.value) return;
+      props.__hintCirclesShown = true;
+      render();
+      hintRevealTimer = setTimeout(tick, 5000);
+    }
+
     if(props.__hintShownChars > 0){
-      // 既にヒントが進んでる国は、続きからソノまま再開するダカラ（最初から10秒待たせないヨ）
+      // 既に文字が見えてる国は、続きからソノまま再開するダカラ
       render();
       if(props.__hintShownChars < total){
         hintRevealTimer = setTimeout(tick, 3000);
       }
+    } else if(props.__hintCirclesShown){
+      // ◯だけ見えてる状態からの再開ダカラ
+      render();
+      hintRevealTimer = setTimeout(tick, 5000);
     } else {
-      hintRevealTimer = setTimeout(tick, 10000);
+      hintRevealTimer = setTimeout(afterCircles, circleDelay);
     }
   }
 
@@ -2428,10 +2435,16 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
 
   function startGame(){
-    state.mode = document.getElementById('mode-select').value;
+    const modeValue = document.getElementById('mode-select').value;
+    if(modeValue.startsWith('countdown_')){
+      state.mode = 'countdown';
+      state.timeLimit = parseInt(modeValue.split('_')[1], 10);
+    } else {
+      state.mode = modeValue;
+      state.timeLimit = 180; // タイムアタック/ヒントモードは表示上使わないケド、念のためデフォルト入れとくヨ
+    }
     state.quizType = document.getElementById('quiztype-select').value;
     state.region = document.getElementById('region-select').value;
-    state.timeLimit = parseInt(document.getElementById('time-select').value, 10);
     state.correctCount = 0;
     state.elapsed = 0;
     state.timeLeft = state.timeLimit;
@@ -2475,8 +2488,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     timeDisplay.classList.remove('warn');
     timeDisplay.textContent = (state.mode === "countdown" || state.mode === "hint") ? fmtTime(state.timeLeft) : "00:00";
-
-    document.getElementById('time-select').style.display = state.mode === "countdown" ? "" : "none";
 
     overlay.classList.add('hidden');
     resultPanel.classList.remove('show');
@@ -2581,14 +2592,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resultPanel.classList.add('show');
   }
 
-  const modeSelectEl = document.getElementById('mode-select');
-  const timeSelectEl = document.getElementById('time-select');
-  function syncTimeSelectVisibility(){
-    timeSelectEl.style.display = modeSelectEl.value === "countdown" ? "" : "none";
-  }
-  syncTimeSelectVisibility();
-  modeSelectEl.addEventListener('change', syncTimeSelectVisibility);
-
   // ---------- 対戦モード(Supabase Realtime) ----------
   const SUPABASE_URL = "https://acytuhewfhuoxugwmbat.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_ruAGcA3YSvXXCPkc3s6aTQ_4lg3wAYJ";
@@ -2650,6 +2653,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       f.properties.__correct = false;
       f.properties.__hintUsed = false;
       f.properties.__hintShownChars = 0;
+      f.properties.__hintCirclesShown = false;
       delete f.properties.__claimedBy;
       const layer = layers[f.properties.name_ja];
       if(layer){ layer.setStyle(styleFor(f, false)); layer.unbindTooltip(); }

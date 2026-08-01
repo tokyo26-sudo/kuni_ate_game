@@ -533,7 +533,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.97</span>
+      <span class="sub mono" id="version-tag">v1.99</span>
     </div>
   </header>
 
@@ -784,6 +784,17 @@
       <div id="vs-join-form" style="display:none; flex-direction:column; gap:10px; align-items:center;">
         <input id="vs-code-input" type="text" maxlength="4" placeholder="4桁の部屋番号" style="width:160px; text-align:center; font-size:22px; letter-spacing:0.2em; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg-deep); color:var(--ink);">
         <input id="vs-name-input-join" type="text" maxlength="12" placeholder="ニックネーム" style="width:160px; text-align:center; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg-deep); color:var(--ink);">
+        <div class="desc" style="margin-top:4px;">自分だけのハンデ設定ダカラ（相手には見えないヨ）</div>
+        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="vs-handicap-flagmode-join" style="accent-color:var(--gold-dim); width:14px; height:14px;">
+            選択した国だけ国旗表示
+          </label>
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="vs-handicap-hint-join" style="accent-color:var(--teal); width:14px; height:14px;">
+            じわじわヒントあり
+          </label>
+        </div>
         <button class="primary" id="vs-join-btn">入室する</button>
       </div>
       <div id="vs-create-form" style="display:none; flex-direction:column; gap:10px; align-items:center;">
@@ -810,6 +821,17 @@
           <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:not-allowed; opacity:0.45;">
             <input type="checkbox" id="vs-bonus-toggle" disabled style="accent-color:var(--teal); width:14px; height:14px;">
             ボーナスルール（未実装）
+          </label>
+        </div>
+        <div class="desc" style="margin-top:4px;">自分だけのハンデ設定ダカラ（相手には見えないヨ）</div>
+        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="vs-handicap-flagmode-create" style="accent-color:var(--gold-dim); width:14px; height:14px;">
+            選択した国だけ国旗表示
+          </label>
+          <label class="ctl" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="vs-handicap-hint-create" style="accent-color:var(--teal); width:14px; height:14px;">
+            じわじわヒントあり
           </label>
         </div>
         <button class="primary" id="vs-create-confirm-btn">部屋を作成</button>
@@ -1655,6 +1677,16 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const code = (props.cca2 || '').toLowerCase();
     return code ? ('https://flagcdn.com/' + code + '.svg') : '';
   }
+  // 国旗の画像、たまに一過性の通信グリッチで読み込み失敗するコトがあるダカラ、
+  // 失敗したら少し待ってから1回だけ自動で読み直す保険をかけとくヨ（バッジ列・対戦結果画面、両方で使うヨ）
+  function attachImgRetry(img, url){
+    let retried = false;
+    img.addEventListener('error', () => {
+      if(retried) return;
+      retried = true;
+      setTimeout(() => { img.src = url + (url.includes('?') ? '&' : '?') + 'retry=1'; }, 600);
+    });
+  }
   // 紋章・市章（透明背景で単体だと見えにくいコトがあるダカラ）かどうかを判定するヨ。
   // データが無くて国旗で代用してる場合は、旗自体が背景色を持ってるカラ座布団は不要ダヨ
   function capitalBadgeIsEmblem(props){
@@ -1684,6 +1716,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     const rowImg = document.createElement('img');
     rowImg.src = url; rowImg.alt = name; rowImg.loading = 'lazy';
+    attachImgRetry(rowImg, url);
     if(isEmblem) rowImg.classList.add('badge-emblem');
     sessionBadgeRow.appendChild(rowImg);
     sessionBadgeRow.classList.add('has-items');
@@ -1691,6 +1724,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     const gridImg = document.createElement('img');
     gridImg.src = url; gridImg.alt = name; gridImg.title = name; gridImg.loading = 'lazy';
+    attachImgRetry(gridImg, url);
     if(isEmblem) gridImg.classList.add('badge-emblem');
     gridImg.addEventListener('click', () => {
       document.getElementById('flag-zoom-img').src = url;
@@ -2669,6 +2703,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     standbyShown: false,
     advancingPhase: false,
     matchEndAt: null, // 対戦の残り時間は「引き算」じゃなくて、コレ（絶対終了時刻）との差分で計算するダカラ
+    myHandicap: { flagMode: false, hintReveal: false }, // 自分だけのハンデ設定（相手には同期しないヨ）
     matchStartAt: null,
     claimLog: [], // 結果画面の演出用に「誰が・何を・どんな種類で取ったか」を順番に記録するダカラ
     resultRevealTimer: null,
@@ -2761,6 +2796,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   async function vsCreateRoom(){
     if(!sb){ vsSetStatus('Supabase未接続ダカラ、部屋を作れないヨ'); return; }
     const name = document.getElementById('vs-name-input-create').value.trim() || 'プレイヤー';
+    vsState.myHandicap = {
+      flagMode: document.getElementById('vs-handicap-flagmode-create').checked,
+      hintReveal: document.getElementById('vs-handicap-hint-create').checked,
+    };
     vsSetStatus('部屋を作成中ダカラ...');
     const code = genRoomCode();
     const settings = {
@@ -2805,6 +2844,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(!sb){ vsSetStatus('Supabase未接続ダカラ、参加できないヨ'); return; }
     const code = document.getElementById('vs-code-input').value.trim();
     const name = document.getElementById('vs-name-input-join').value.trim() || 'プレイヤー';
+    vsState.myHandicap = {
+      flagMode: document.getElementById('vs-handicap-flagmode-join').checked,
+      hintReveal: document.getElementById('vs-handicap-hint-join').checked,
+    };
     if(!/^\d{4}$/.test(code)){ vsSetStatus('4桁の数字を入力してクダサイ'); return; }
     vsSetStatus('入室中ダカラ...');
     try {
@@ -3327,6 +3370,17 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsState.dobonClaimedPlayerId = null;
     vsState.claimLog = [];
 
+    // ハンデ設定は「相手には同期しない、自分の画面にだけ効く」設定ダカラ、
+    // 部屋のルール(vsApplyRuleSettings)を適用した後で、上書きする形で反映するヨ
+    if(vsState.myHandicap.flagMode){
+      state.flagMode = true;
+      state.maskOtherFlags = true;
+      document.body.classList.add('flagmode-on');
+    }
+    if(vsState.myHandicap.hintReveal){
+      state.hintRevealEnabled = true;
+    }
+
     // 「1秒ずつ引き算」じゃなくて、絶対時刻（開始・終了時刻）との差分で毎回計算し直す方式にするダカラ。
     // コレなら、スマホでタイマーがサボられて多少ズレても、次に動いた時に正しい残り時間にちゃんと追いつくヨ
     const matchStartAt = settings.startAt || Date.now();
@@ -3448,6 +3502,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       img.alt = entry.countryName;
       img.title = entry.countryName;
       img.loading = 'lazy';
+      attachImgRetry(img, url);
       if(entry.kind === 'dobon') img.classList.add('kind-dobon');
       if(entry.kind === 'bonus') img.classList.add('kind-bonus');
       img.addEventListener('click', () => {

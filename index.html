@@ -351,9 +351,34 @@
   }
   .vs-player-row .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
   .vs-player-row .role { color:var(--ink-dim); font-size:11px; margin-left:auto; }
-  #vs-result-list { display:flex; flex-direction:column; gap:8px; font-size:15px; }
-  .vs-result-row { background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px; padding:10px 20px; min-width:240px; }
-  .vs-result-row.winner { border-color:var(--gold); color:var(--gold); font-weight:700; }
+  #vs-result-columns {
+    display:flex; gap:14px; width:100%; max-width:920px; justify-content:center;
+    align-items:stretch; flex:1; min-height:0;
+  }
+  .vs-result-col {
+    flex:1; min-width:0; display:flex; flex-direction:column; gap:8px;
+    background:var(--bg-panel-2); border:2px solid var(--line); border-radius:10px; padding:10px;
+    transition:border-color .3s ease, box-shadow .3s ease;
+  }
+  .vs-result-col.winner { border-color:var(--gold); box-shadow:0 0 18px rgba(232,163,61,0.45); }
+  .vs-result-col-header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .vs-result-col-name { font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .vs-result-col-score { font-size:22px; font-weight:800; font-family:inherit; }
+  .vs-result-flags {
+    display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start;
+    max-height:48vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .vs-result-flags img {
+    width:34px; height:34px; border-radius:6px; border:1px solid var(--line);
+    object-fit:contain; background:var(--bg-deep); cursor:pointer;
+    box-shadow:0 3px 8px rgba(0,0,0,0.3); animation: badgePop .25s ease;
+  }
+  .vs-result-flags img.kind-dobon { border-color:var(--red); box-shadow:0 0 8px rgba(224,92,92,0.7); }
+  .vs-result-flags img.kind-bonus { border-color:var(--teal); box-shadow:0 0 8px rgba(92,201,201,0.7); }
+  @media (max-width: 720px){
+    .vs-result-flags { display:grid; grid-template-columns:repeat(2, 1fr); max-height:56vh; }
+    .vs-result-flags img { width:100%; height:auto; aspect-ratio:1/1; }
+  }
 
   #result-box { display:none; flex-direction:column; gap:14px; align-items:center; }
   #result-box.show { display:flex; }
@@ -508,7 +533,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.92</span>
+      <span class="sub mono" id="version-tag">v1.94</span>
     </div>
   </header>
 
@@ -812,7 +837,8 @@
 
     <div id="vs-result-overlay">
       <h1>対戦結果</h1>
-      <div id="vs-result-list"></div>
+      <div id="vs-result-columns"></div>
+      <button class="ctl" id="vs-result-skip-btn">演出をスキップ</button>
       <div class="overlay-controls">
         <button class="primary" id="vs-result-back-btn">ロビーに戻る</button>
       </div>
@@ -1819,6 +1845,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function submitAnswer(){
     if(!state.activeFeature) return;
+    if(state.vsMode && !vsState.playing) return; // 試合が終わってたら、選択済みの国が残ってても提出させないダカラ
     const val = normalize(answerInput.value);
     if(!val) return;
     const feature = state.activeFeature;
@@ -2641,6 +2668,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     advancingPhase: false,
     matchEndAt: null, // 対戦の残り時間は「引き算」じゃなくて、コレ（絶対終了時刻）との差分で計算するダカラ
     matchStartAt: null,
+    claimLog: [], // 結果画面の演出用に「誰が・何を・どんな種類で取ったか」を順番に記録するダカラ
+    resultRevealTimer: null,
+    skipResultAnimation: null,
   };
 
   const PLAYER_COLORS = ["#e8a33d", "#4a90d9", "#9b6bd1", "#5cbf6a", "#e05c5c", "#5cc9c9"];
@@ -3101,6 +3131,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   async function vsSubmitClaim(feature){
     closePanel();
+    if(!vsState.playing) return; // 念のため二重チェックダカラ（試合終了後は提出しないヨ）
     if(!sb || !vsState.roomId || !vsState.myPlayerId) return;
     try {
       const { error } = await sb.from('claims').insert({
@@ -3147,6 +3178,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     // ボーナス国だったら、取った本人の画面だけヒントが出るヨ（相手には見えないダカラ）
     const bonusEntry = state.bonusEnabled ? state.bonusSet.find(b => b.feature === feature) : null;
+
+    // 結果画面の演出用に、取った順番を記録しとくダカラ
+    vsState.claimLog.push({
+      playerId: claim.player_id,
+      countryName: claim.country_name,
+      cca2: feature.properties.cca2,
+      kind: isDobon ? 'dobon' : (bonusEntry ? 'bonus' : 'normal'),
+    });
 
     vsUpdateScoreboard();
     if(claim.player_id === vsState.myPlayerId){
@@ -3265,6 +3304,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     COUNTRY_GEOJSON.features.forEach(f => { delete f.properties.__claimedBy; });
     vsApplyRuleSettings(settings);
     vsState.dobonClaimedPlayerId = null;
+    vsState.claimLog = [];
 
     // 「1秒ずつ引き算」じゃなくて、絶対時刻（開始・終了時刻）との差分で毎回計算し直す方式にするダカラ。
     // コレなら、スマホでタイマーがサボられて多少ズレても、次に動いた時に正しい残り時間にちゃんと追いつくヨ
@@ -3326,20 +3366,105 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsHideSimpleOverlays();
     vsState.revealShown = false;
     vsState.standbyShown = false;
+    showOverlayById('vs-result-overlay');
+    vsRenderResultAnimated();
+  }
+
+  // 「勝敗の決め方」だけをココに切り出しとくダカラ。今は「取った国の数（ドボンは-1）」ダケド、
+  // 将来ポイント制とか別ルールに変えたくなっても、コノ関数の中身だけ差し替えればイイようにしてあるヨ
+  function vsComputeScore(playerId, counts){
+    let score = counts[playerId] || 0;
+    if(state.dobonEnabled && vsState.dobonClaimedPlayerId === playerId) score -= 1;
+    return score;
+  }
+
+  // 対戦結果を「旗が1個ずつ増えていく演出」で見せるダカラ。演出が終わっても画面はソノまま残るヨ
+  // （じっくり見返せるように、コッチから閉じるまで切り替わらない設計ダカラ）
+  function vsRenderResultAnimated(){
+    const players = vsState.players.filter(p => p.role === 'player');
     const counts = {};
     COUNTRY_GEOJSON.features.forEach(f => {
       if(f.properties.__claimedBy) counts[f.properties.__claimedBy] = (counts[f.properties.__claimedBy] || 0) + 1;
     });
-    const players = vsState.players.filter(p => p.role === 'player');
-    const maxCount = Math.max(0, ...players.map(p => counts[p.id] || 0));
-    const listEl = document.getElementById('vs-result-list');
-    listEl.innerHTML = players.map(p => {
-      const c = counts[p.id] || 0;
-      const isWinner = c === maxCount && maxCount > 0;
-      return '<div class="vs-result-row' + (isWinner ? ' winner' : '') + '">' +
-        p.name + '：' + c + 'ヶ国' + (isWinner ? ' 🏆' : '') + '</div>';
-    }).join('');
-    showOverlayById('vs-result-overlay');
+
+    const columnsEl = document.getElementById('vs-result-columns');
+    columnsEl.innerHTML = players.map(p =>
+      '<div class="vs-result-col" id="vs-result-col-' + p.id + '">' +
+        '<div class="vs-result-col-header">' +
+          '<span class="vs-result-col-name" style="color:' + (p.color || '#888') + '">' + p.name + '</span>' +
+          '<span class="vs-result-col-score" id="vs-result-score-' + p.id + '" style="color:' + (p.color || '#888') + '">0</span>' +
+        '</div>' +
+        '<div class="vs-result-flags" id="vs-result-flags-' + p.id + '"></div>' +
+      '</div>'
+    ).join('');
+
+    if(vsState.resultRevealTimer){ clearTimeout(vsState.resultRevealTimer); vsState.resultRevealTimer = null; }
+
+    const log = vsState.claimLog.slice();
+    const revealedCounts = {};
+
+    function appendOne(entry){
+      const flagsEl = document.getElementById('vs-result-flags-' + entry.playerId);
+      if(!flagsEl) return;
+      const code = (entry.cca2 || '').toLowerCase();
+      const url = code ? ('https://flagcdn.com/' + code + '.svg') : '';
+      if(!url) return;
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = entry.countryName;
+      img.title = entry.countryName;
+      img.loading = 'lazy';
+      if(entry.kind === 'dobon') img.classList.add('kind-dobon');
+      if(entry.kind === 'bonus') img.classList.add('kind-bonus');
+      img.addEventListener('click', () => {
+        document.getElementById('flag-zoom-img').src = url;
+        document.getElementById('flag-zoom-img').alt = entry.countryName;
+        document.getElementById('flag-zoom-name').textContent = entry.countryName;
+        document.getElementById('flag-zoom-sub').textContent = entry.kind === 'dobon' ? 'ドボン' : (entry.kind === 'bonus' ? 'ボーナス' : '');
+        document.getElementById('flag-zoom-modal').classList.add('show');
+      });
+      flagsEl.appendChild(img);
+
+      revealedCounts[entry.playerId] = (revealedCounts[entry.playerId] || 0) + 1;
+      const scoreEl = document.getElementById('vs-result-score-' + entry.playerId);
+      if(scoreEl) scoreEl.textContent = vsComputeScore(entry.playerId, revealedCounts);
+    }
+
+    function finalizeWinnerHighlight(){
+      const finalScores = {};
+      players.forEach(p => { finalScores[p.id] = vsComputeScore(p.id, counts); });
+      const maxScore = Math.max(0, ...players.map(p => finalScores[p.id]));
+      players.forEach(p => {
+        const colEl = document.getElementById('vs-result-col-' + p.id);
+        const scoreEl = document.getElementById('vs-result-score-' + p.id);
+        if(scoreEl) scoreEl.textContent = finalScores[p.id];
+        if(colEl) colEl.classList.toggle('winner', finalScores[p.id] === maxScore && maxScore > 0);
+      });
+    }
+
+    function revealNext(i){
+      if(i >= log.length){
+        finalizeWinnerHighlight();
+        vsState.resultRevealTimer = null;
+        return;
+      }
+      appendOne(log[i]);
+      vsState.resultRevealTimer = setTimeout(() => revealNext(i + 1), 180);
+    }
+
+    function skipToEnd(){
+      if(vsState.resultRevealTimer){ clearTimeout(vsState.resultRevealTimer); vsState.resultRevealTimer = null; }
+      players.forEach(p => { document.getElementById('vs-result-flags-' + p.id).innerHTML = ''; });
+      log.forEach(appendOne);
+      finalizeWinnerHighlight();
+    }
+    vsState.skipResultAnimation = skipToEnd;
+
+    if(log.length){
+      revealNext(0);
+    } else {
+      finalizeWinnerHighlight();
+    }
   }
 
   document.getElementById('vs-create-confirm-btn').addEventListener('click', vsCreateRoom);
@@ -3366,7 +3491,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     resetViewportOverrides();
     showOverlayById('overlay');
   });
+  document.getElementById('vs-result-skip-btn').addEventListener('click', () => {
+    if(typeof vsState.skipResultAnimation === 'function') vsState.skipResultAnimation();
+  });
   document.getElementById('vs-result-back-btn').addEventListener('click', () => {
+    if(vsState.resultRevealTimer){ clearTimeout(vsState.resultRevealTimer); vsState.resultRevealTimer = null; }
     if(vsState.channel && sb) sb.removeChannel(vsState.channel);
     vsStopPolling();
     vsState.roomId = null;

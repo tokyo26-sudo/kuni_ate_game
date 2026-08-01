@@ -533,7 +533,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.99</span>
+      <span class="sub mono" id="version-tag">v2.00</span>
     </div>
   </header>
 
@@ -2265,7 +2265,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const props = feature.properties;
     if(typeof props.__hintShownChars !== 'number') props.__hintShownChars = 0;
     if(typeof props.__hintCirclesShown !== 'boolean') props.__hintCirclesShown = false;
-    const circleDelay = state.hintPractice ? 0 : 5000;
+    // ヒントモード（練習用）と、対戦モードの「じわじわヒントあり」ハンデは、どっちも即座に◯＋頭文字が見えるようにするダカラ
+    const circleDelay = (state.hintPractice || (state.vsMode && vsState.myHandicap.hintReveal)) ? 0 : 5000;
 
     function render(){
       if(state.activeFeature !== feature || answerInput.value) return;
@@ -3342,6 +3343,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.region = settings.region || "all";
     state.mode = settings.mode || "countdown";
     state.quizType = "country"; // 対戦モードは今のところ国名当てのみ対応ダカラ
+    state.hintPractice = false; // シングルプレイのヒントモードの設定が残ってると、じわじわヒントのタイミングが狂うカラ、念のためリセットしとくヨ
     state.timeLimit = settings.timeLimit || 180;
     state.dobonEnabled = !!settings.dobonEnabled;
     state.dobonMode = settings.dobonMode || 'penalty';
@@ -3438,6 +3440,26 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
   }
 
+  // 時間切れ・強制終了、ドッチの理由でも「今ゲームが終わったダカラ」ってハッキリ伝わるよう、
+  // 結果画面に切り替わる前に一瞬フラッシュ表示するヨ（「何が起きたかワカラナイ」を防ぐタメダカラ）
+  function vsShowFinishFlash(callback){
+    let overlay = document.getElementById('vs-finish-flash-overlay');
+    if(!overlay){
+      overlay = document.createElement('div');
+      overlay.id = 'vs-finish-flash-overlay';
+      overlay.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; background:rgba(0,0,0,0.8); color:#fff; text-align:center; padding:24px; font-family:inherit;';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML =
+      '<div style="font-size:36px; font-weight:900;">⏰ ゲーム終了ダカラ！</div>' +
+      '<div style="font-size:14px; opacity:0.85;">結果を集計してるダカラ、少し待ってネ…</div>';
+    overlay.style.display = 'flex';
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      callback();
+    }, 1500);
+  }
+
   function vsFinishMatch(){
     if(state.timer){ clearInterval(state.timer); state.timer = null; }
     vsState.playing = false;
@@ -3454,8 +3476,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsHideSimpleOverlays();
     vsState.revealShown = false;
     vsState.standbyShown = false;
-    showOverlayById('vs-result-overlay');
-    vsRenderResultAnimated();
+    vsShowFinishFlash(() => {
+      showOverlayById('vs-result-overlay');
+      vsRenderResultAnimated();
+    });
   }
 
   // 「勝敗の決め方」だけをココに切り出しとくダカラ。今は「取った国の数（ドボンは-1）」ダケド、

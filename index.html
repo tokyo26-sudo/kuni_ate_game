@@ -533,7 +533,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.95</span>
+      <span class="sub mono" id="version-tag">v1.97</span>
     </div>
   </header>
 
@@ -1709,6 +1709,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function onCountryClick(feature, layer){
     if(!state.running) return;
+    if(state.vsMode && vsCheckTimeUp()) return; // タップした瞬間にも時間切れチェックするダカラ
     if(feature.properties.__correct) return;
     if(state.region !== "all" && feature.properties.region_ja !== state.region) {
       showToast("選択中の地域の範囲外ダカラ", true);
@@ -1845,6 +1846,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function submitAnswer(){
     if(!state.activeFeature) return;
+    if(state.vsMode && vsCheckTimeUp()) return; // 決定を押した瞬間にも時間切れチェックするダカラ
     if(state.vsMode && !vsState.playing) return; // 試合が終わってたら、選択済みの国が残ってても提出させないダカラ
     const val = normalize(answerInput.value);
     if(!val) return;
@@ -2928,6 +2930,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     try {
       const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
       if(room) vsHandleRoomUpdate(room);
+      if(vsCheckTimeUp()) return; // ポーリングのタイミングでも時間切れチェックするダカラ
       if(!vsState.playing){
         await vsRefreshPlayerList();
       } else {
@@ -3353,19 +3356,28 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     state.timer = setInterval(vsTickTimer, 1000);
   }
 
+  // 「もう時間切れになってないか」を、setIntervalのタイマー以外の色んなタイミングからも
+  // チェックできるように、判定部分だけ独立させとくダカラ。
+  // （iPhone SafariだとsetInterval自体がスッカリ止まっちゃうコトがあるカラ、
+  // 　タップとか通信のやり取りとか、何かアクションがあった時にもコレを呼んで二重に保険をかけるヨ）
+  function vsCheckTimeUp(){
+    if(!vsState.playing || state.mode !== "countdown" || !vsState.matchEndAt) return false;
+    if(Date.now() < vsState.matchEndAt) return false;
+    state.timeLeft = 0;
+    timeDisplay.textContent = fmtTime(0);
+    if(vsState.myRole === 'player'){
+      sb.from('rooms').update({ status:'finished' }).eq('id', vsState.roomId).catch(() => {});
+    }
+    vsFinishMatch();
+    return true;
+  }
+
   function vsTickTimer(){
     if(state.mode === "countdown"){
+      if(vsCheckTimeUp()) return;
       state.timeLeft = Math.max(0, Math.ceil((vsState.matchEndAt - Date.now()) / 1000));
       timeDisplay.textContent = fmtTime(state.timeLeft);
       timeDisplay.classList.toggle('warn', state.timeLeft <= 10);
-      if(state.timeLeft <= 0){
-        // 通信の往復を待たず、自分の画面はここで即終わらせるダカラ
-        // （相手の画面にも伝わるよう、ダメ元でrooms側も更新しておくヨ）
-        if(vsState.myRole === 'player'){
-          sb.from('rooms').update({ status:'finished' }).eq('id', vsState.roomId).catch(() => {});
-        }
-        vsFinishMatch();
-      }
     } else {
       state.elapsed = Math.max(0, Math.floor((Date.now() - vsState.matchStartAt) / 1000));
       timeDisplay.textContent = fmtTime(state.elapsed);
@@ -3377,6 +3389,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsState.playing = false;
     state.running = false;
     state.vsMode = false;
+    // ポーリングを止めないと、「終了しました」のDB書き込みが間に合ってない一瞬のスキに
+    // 古い「プレイ中」情報を拾って試合を勝手に再開しちゃうコトがあったカラ、コレが今回の本命バグダヨ
+    vsStopPolling();
+    if(vsState.channel && sb){ sb.removeChannel(vsState.channel); vsState.channel = null; }
     document.body.classList.remove('playing');
     document.body.classList.remove('vs-mode');
     document.getElementById('vs-force-end-btn').style.display = 'none';

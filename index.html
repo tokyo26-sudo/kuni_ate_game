@@ -533,7 +533,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.94</span>
+      <span class="sub mono" id="version-tag">v1.95</span>
     </div>
   </header>
 
@@ -3001,20 +3001,46 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
   }
 
+  // 2人がホボ同時に書き込むと、片方の記録が消えちゃう競合が起きるコトがあるダカラ、
+  // 「書いた後、本当に残ってるか確認して、消えてたら書き直す」を数回リトライする共通処理にするヨ
+  async function vsAckField(fieldName, expectedPhase){
+    for(let attempt = 0; attempt < 6; attempt++){
+      try {
+        const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
+        const settings = Object.assign({}, room.settings);
+        if(expectedPhase && settings.phase !== expectedPhase){
+          vsState.roomSettings = settings;
+          return; // フェーズがもう先に進んでたら、何もしなくていいダカラ
+        }
+        const acks = Object.assign({}, settings[fieldName] || {});
+        if(acks[vsState.myPlayerId]){
+          vsState.roomSettings = settings;
+          return; // 既に自分の分は残ってるカラ、書き込み不要ダヨ
+        }
+        acks[vsState.myPlayerId] = true;
+        settings[fieldName] = acks;
+        vsState.roomSettings = settings;
+        await sb.from('rooms').update({ settings }).eq('id', vsState.roomId);
+        // 書き込んだ直後、他の端末の書き込みと競合して消されてないか確認するダカラ
+        await new Promise(r => setTimeout(r, 350 + Math.random() * 350));
+        const { data: verify } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
+        if(verify && verify.settings && verify.settings[fieldName] && verify.settings[fieldName][vsState.myPlayerId]){
+          vsState.roomSettings = verify.settings;
+          return; // ちゃんと残ってたからOKダカラ
+        }
+        // 消えてたら、ループの先頭に戻ってもう一回書き直すヨ
+      } catch(err){
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+  }
+
   // ドボン・ボーナスの説明、両方読み終わったら「準備OK」を書き込むダカラ
   async function vsAckReveal(){
     const overlay = vsGetOrCreateSimpleOverlay('vs-waiting-overlay');
     overlay.innerHTML = '<div style="font-size:18px; font-weight:700;">相手が読み終わるのを待ってるダカラ…</div>';
     overlay.style.display = 'flex';
-    try {
-      const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
-      const settings = Object.assign({}, room.settings);
-      const acks = Object.assign({}, settings.revealAcks || {});
-      acks[vsState.myPlayerId] = true;
-      settings.revealAcks = acks;
-      vsState.roomSettings = settings;
-      await sb.from('rooms').update({ settings }).eq('id', vsState.roomId);
-    } catch(err){ /* ポーリングで後から追いつくダカラ */ }
+    await vsAckField('revealAcks', 'reveal');
   }
 
   // 両方読み終わったのを見たホストが、準備フェーズへ進めるダカラ
@@ -3053,15 +3079,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(btn) btn.disabled = true;
     const statusEl = document.getElementById('vs-standby-status');
     if(statusEl) statusEl.textContent = '相手の準備を待ってるダカラ…';
-    try {
-      const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
-      const settings = Object.assign({}, room.settings);
-      const acks = Object.assign({}, settings.readyAcks || {});
-      acks[vsState.myPlayerId] = true;
-      settings.readyAcks = acks;
-      vsState.roomSettings = settings;
-      await sb.from('rooms').update({ settings }).eq('id', vsState.roomId);
-    } catch(err){ /* 次のポーリングでリトライされるダカラ */ }
+    await vsAckField('readyAcks', 'standby');
   }
 
   // 両方の「開始」が揃ったのを見たホストが、実際のカウントダウン開始時刻を決めるダカラ

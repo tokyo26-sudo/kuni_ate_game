@@ -508,7 +508,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v1.91</span>
+      <span class="sub mono" id="version-tag">v1.92</span>
     </div>
   </header>
 
@@ -2639,6 +2639,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     revealShown: false,
     standbyShown: false,
     advancingPhase: false,
+    matchEndAt: null, // 対戦の残り時間は「引き算」じゃなくて、コレ（絶対終了時刻）との差分で計算するダカラ
+    matchStartAt: null,
   };
 
   const PLAYER_COLORS = ["#e8a33d", "#4a90d9", "#9b6bd1", "#5cbf6a", "#e05c5c", "#5cc9c9"];
@@ -2891,26 +2893,37 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   // リアルタイム通知、環境によっては届かないことがあるダカラ、保険で定期的にDBを見に行くヨ
   // （相手の入室・試合開始・試合終了に片方だけ気づけない、っていう不具合の対策ダカラ）
+  async function vsPollOnce(){
+    if(!vsState.roomId || !sb) return;
+    try {
+      const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
+      if(room) vsHandleRoomUpdate(room);
+      if(!vsState.playing){
+        await vsRefreshPlayerList();
+      } else {
+        const { data: claims } = await sb.from('claims').select().eq('room_id', vsState.roomId);
+        (claims || []).forEach(vsHandleClaim);
+      }
+    } catch(err){ /* 通信失敗した時は、次のポーリングに任せるダカラ */ }
+  }
+
   function vsStartPolling(){
     vsStopPolling();
-    vsState.pollTimer = setInterval(async () => {
-      if(!vsState.roomId || !sb) return;
-      try {
-        const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
-        if(room) vsHandleRoomUpdate(room);
-        if(!vsState.playing){
-          await vsRefreshPlayerList();
-        } else {
-          const { data: claims } = await sb.from('claims').select().eq('room_id', vsState.roomId);
-          (claims || []).forEach(vsHandleClaim);
-        }
-      } catch(err){ /* 通信失敗した時は、次のポーリングに任せるダカラ */ }
-    }, 2500);
+    vsState.pollTimer = setInterval(vsPollOnce, 2500);
   }
 
   function vsStopPolling(){
     if(vsState.pollTimer){ clearInterval(vsState.pollTimer); vsState.pollTimer = null; }
   }
+
+  // スマホで画面ロック解除・アプリ復帰した瞬間、2.5秒待たずスグに最新状態を取りに行くダカラ
+  // （バックグラウンドでサボられてたタイマーが、復帰時に一気にまとめて処理されるのを防ぐネ）
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && vsState.roomId){
+      vsPollOnce();
+      if(vsState.playing) vsTickTimer();
+    }
+  });
 
   function vsHandleRoomUpdate(room){
     const settings = room.settings || {};
@@ -3253,6 +3266,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsApplyRuleSettings(settings);
     vsState.dobonClaimedPlayerId = null;
 
+    // 「1秒ずつ引き算」じゃなくて、絶対時刻（開始・終了時刻）との差分で毎回計算し直す方式にするダカラ。
+    // コレなら、スマホでタイマーがサボられて多少ズレても、次に動いた時に正しい残り時間にちゃんと追いつくヨ
+    const matchStartAt = settings.startAt || Date.now();
+    vsState.matchStartAt = matchStartAt;
+    vsState.matchEndAt = matchStartAt + state.timeLimit * 1000;
+
     state.timeLeft = state.timeLimit;
     state.elapsed = 0;
     state.running = true;
@@ -3272,24 +3291,27 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     timeDisplay.classList.remove('warn');
     timeDisplay.textContent = state.mode === "countdown" ? fmtTime(state.timeLeft) : "00:00";
     if(state.timer) clearInterval(state.timer);
-    state.timer = setInterval(() => {
-      if(state.mode === "countdown"){
-        state.timeLeft -= 1;
-        timeDisplay.textContent = fmtTime(state.timeLeft);
-        timeDisplay.classList.toggle('warn', state.timeLeft <= 10);
-        if(state.timeLeft <= 0){
-          // 通信の往復を待たず、自分の画面はここで即終わらせるダカラ
-          // （相手の画面にも伝わるよう、ダメ元でrooms側も更新しておくヨ）
-          if(vsState.myRole === 'player'){
-            sb.from('rooms').update({ status:'finished' }).eq('id', vsState.roomId).catch(() => {});
-          }
-          vsFinishMatch();
+    vsTickTimer();
+    state.timer = setInterval(vsTickTimer, 1000);
+  }
+
+  function vsTickTimer(){
+    if(state.mode === "countdown"){
+      state.timeLeft = Math.max(0, Math.ceil((vsState.matchEndAt - Date.now()) / 1000));
+      timeDisplay.textContent = fmtTime(state.timeLeft);
+      timeDisplay.classList.toggle('warn', state.timeLeft <= 10);
+      if(state.timeLeft <= 0){
+        // 通信の往復を待たず、自分の画面はここで即終わらせるダカラ
+        // （相手の画面にも伝わるよう、ダメ元でrooms側も更新しておくヨ）
+        if(vsState.myRole === 'player'){
+          sb.from('rooms').update({ status:'finished' }).eq('id', vsState.roomId).catch(() => {});
         }
-      } else {
-        state.elapsed += 1;
-        timeDisplay.textContent = fmtTime(state.elapsed);
+        vsFinishMatch();
       }
-    }, 1000);
+    } else {
+      state.elapsed = Math.max(0, Math.floor((Date.now() - vsState.matchStartAt) / 1000));
+      timeDisplay.textContent = fmtTime(state.elapsed);
+    }
   }
 
   function vsFinishMatch(){
@@ -3300,6 +3322,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.body.classList.remove('playing');
     document.body.classList.remove('vs-mode');
     document.getElementById('vs-force-end-btn').style.display = 'none';
+    closePanel(); // コレが抜けてたカラ、試合終了しても入力欄が開きっぱなしになってたんダヨ
     vsHideSimpleOverlays();
     vsState.revealShown = false;
     vsState.standbyShown = false;

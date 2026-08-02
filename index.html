@@ -533,7 +533,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v2.00</span>
+      <span class="sub mono" id="version-tag">v2.01</span>
     </div>
   </header>
 
@@ -2686,6 +2686,28 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
+  // 各端末の時計は数百ミリ秒〜1秒くらいズレてることがフツウにあるカラ、
+  // 「サーバーが返してくるHTTP応答の時刻」を基準に、自分の時計とのズレを一度だけ測っておくヨ。
+  // 試合開始・終了のタイミングは、コッチの補正込みの時刻(vsNow())を使うカラ、両端末でズレにくくなるハズダヨ
+  async function vsMeasureServerTimeOffset(){
+    try {
+      const t0 = Date.now();
+      const resp = await fetch(SUPABASE_URL + '/rest/v1/rooms?select=id&limit=1', {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
+      });
+      const t1 = Date.now();
+      const dateHeader = resp.headers.get('date');
+      if(dateHeader){
+        const serverTime = new Date(dateHeader).getTime();
+        const localTimeAtServerMoment = t0 + (t1 - t0) / 2; // 往復のダイタイ真ん中のタイミングで届いた、って見なすヨ
+        vsState.serverTimeOffset = serverTime - localTimeAtServerMoment;
+      }
+    } catch(err){ /* 測れなくても、ズレ無し(0)扱いのママ今まで通り動くダケダカラ */ }
+  }
+  function vsNow(){
+    return Date.now() + (vsState.serverTimeOffset || 0);
+  }
+
   const vsState = {
     roomId: null,
     roomCode: null,
@@ -2705,6 +2727,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     advancingPhase: false,
     matchEndAt: null, // 対戦の残り時間は「引き算」じゃなくて、コレ（絶対終了時刻）との差分で計算するダカラ
     myHandicap: { flagMode: false, hintReveal: false }, // 自分だけのハンデ設定（相手には同期しないヨ）
+    serverTimeOffset: 0, // 自分の端末の時計とサーバーの時計のズレ（コレを使って開始・終了タイミングを揃えるヨ）
     matchStartAt: null,
     claimLog: [], // 結果画面の演出用に「誰が・何を・どんな種類で取ったか」を順番に記録するダカラ
     resultRevealTimer: null,
@@ -2890,6 +2913,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsState.standbyShown = false;
     vsState.advancingPhase = false;
     vsState.countdownScheduled = false;
+    vsMeasureServerTimeOffset(); // 部屋に入った時点で、早めにズレを測っておくヨ
     vsRenderJoinShare();
     vsSubscribeRoom();
     vsRefreshPlayerList();
@@ -3013,8 +3037,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(room.status === 'playing'){
       if(!vsState.playing && !vsState.countdownScheduled){
         vsHideSimpleOverlays();
-        const startAt = settings.startAt || Date.now();
-        const delay = startAt - Date.now();
+        const startAt = settings.startAt || vsNow();
+        const delay = startAt - vsNow();
         if(delay > 200){
           vsState.countdownScheduled = true;
           vsShowStartCountdown(delay, () => {
@@ -3133,11 +3157,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   async function vsTriggerCountdownStart(){
     if(vsState.advancingPhase) return;
     vsState.advancingPhase = true;
+    await vsMeasureServerTimeOffset(); // 開始時刻を決める直前に、もう一度ズレを測り直して最新にしとくヨ
     try {
       const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
       const settings = Object.assign({}, room.settings);
       if(settings.phase === 'standby'){
-        settings.startAt = Date.now() + 3200;
+        settings.startAt = vsNow() + 3200;
         settings.phase = 'countdown';
         vsState.roomSettings = settings;
         await sb.from('rooms').update({ status: 'playing', settings }).eq('id', vsState.roomId);
@@ -3385,7 +3410,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     // 「1秒ずつ引き算」じゃなくて、絶対時刻（開始・終了時刻）との差分で毎回計算し直す方式にするダカラ。
     // コレなら、スマホでタイマーがサボられて多少ズレても、次に動いた時に正しい残り時間にちゃんと追いつくヨ
-    const matchStartAt = settings.startAt || Date.now();
+    const matchStartAt = settings.startAt || vsNow();
     vsState.matchStartAt = matchStartAt;
     vsState.matchEndAt = matchStartAt + state.timeLimit * 1000;
 
@@ -3418,7 +3443,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // 　タップとか通信のやり取りとか、何かアクションがあった時にもコレを呼んで二重に保険をかけるヨ）
   function vsCheckTimeUp(){
     if(!vsState.playing || state.mode !== "countdown" || !vsState.matchEndAt) return false;
-    if(Date.now() < vsState.matchEndAt) return false;
+    if(vsNow() < vsState.matchEndAt) return false;
     state.timeLeft = 0;
     timeDisplay.textContent = fmtTime(0);
     if(vsState.myRole === 'player'){
@@ -3431,11 +3456,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function vsTickTimer(){
     if(state.mode === "countdown"){
       if(vsCheckTimeUp()) return;
-      state.timeLeft = Math.max(0, Math.ceil((vsState.matchEndAt - Date.now()) / 1000));
+      state.timeLeft = Math.max(0, Math.ceil((vsState.matchEndAt - vsNow()) / 1000));
       timeDisplay.textContent = fmtTime(state.timeLeft);
       timeDisplay.classList.toggle('warn', state.timeLeft <= 10);
     } else {
-      state.elapsed = Math.max(0, Math.floor((Date.now() - vsState.matchStartAt) / 1000));
+      state.elapsed = Math.max(0, Math.floor((vsNow() - vsState.matchStartAt) / 1000));
       timeDisplay.textContent = fmtTime(state.elapsed);
     }
   }

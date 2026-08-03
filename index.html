@@ -387,21 +387,39 @@
     border-top:1px solid var(--line); padding-top:12px; line-height:1.9; }
   #missed-list b { color:var(--ink); font-weight:500; }
 
-  /* ---------- Result panel (地図を隠さないコンパクト版) ---------- */
+  /* ---------- Result panel（対戦結果画面と同じく、旗が1個ずつ増えてく演出付きのフルオーバーレイダヨ） ---------- */
   #result-panel {
-    position:absolute; right:20px; top:20px; z-index:9500;
-    background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
-    padding:16px 18px; box-shadow:0 12px 30px rgba(0,0,0,0.4);
-    display:none; flex-direction:column; gap:8px; max-width:280px;
-    transform:translateX(140%); transition:transform .25s ease;
+    position:absolute; inset:0; z-index:9500; background:var(--overlay-bg);
+    display:none; flex-direction:column; align-items:center; gap:14px;
+    padding:20px; overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
-  #result-panel.show { display:flex; transform:translateX(0); }
-  #result-panel .headline { font-size:12px; color:var(--ink-dim); letter-spacing:0.05em; }
-  #result-panel .main { font-size:32px; font-weight:900; color:var(--gold); font-family:'JetBrains Mono',monospace; }
-  #result-panel .legend { font-size:11px; color:var(--ink-dim); display:flex; align-items:center; gap:6px; }
-  #result-panel .legend .dot { width:10px; height:10px; border-radius:3px; background:var(--teal); display:inline-block; }
-  #result-panel .legend .dot.default { background:var(--land-default); }
-  #result-panel button.primary { margin-top:4px; }
+  #result-panel.show { display:flex; }
+  #result-panel .rp-summary {
+    position:sticky; top:0; z-index:2; width:100%; max-width:640px;
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:12px;
+    padding:14px 18px; box-shadow:0 12px 30px rgba(0,0,0,0.4);
+    display:flex; flex-wrap:wrap; align-items:baseline; justify-content:center;
+    gap:6px 18px; text-align:center;
+  }
+  #result-panel .headline { font-size:12px; color:var(--ink-dim); letter-spacing:0.05em; width:100%; }
+  #result-panel .main { font-size:28px; font-weight:900; color:var(--gold); font-family:'JetBrains Mono',monospace; }
+  #result-panel .rp-points { font-size:14px; font-weight:700; }
+  #result-panel .rp-rate { font-size:12px; color:var(--ink-dim); }
+  #result-panel .flags-grid {
+    display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+    width:100%; max-width:640px; align-content:flex-start;
+  }
+  #result-panel .flags-grid img {
+    width:56px; height:56px; border-radius:8px; border:1px solid var(--line);
+    object-fit:contain; background:var(--bg-deep); cursor:pointer;
+    box-shadow:0 3px 8px rgba(0,0,0,0.3); animation: badgePop .25s ease;
+  }
+  #result-panel .flags-grid img.kind-dobon { border-color:var(--red); box-shadow:0 0 8px rgba(224,92,92,0.7); }
+  #result-panel .flags-grid img.kind-bonus { border-color:var(--teal); box-shadow:0 0 8px rgba(92,201,201,0.7); }
+  @media (max-width: 720px){
+    #result-panel .flags-grid { display:grid; grid-template-columns:repeat(4, 1fr); max-width:420px; }
+    #result-panel .flags-grid img { width:100%; height:auto; aspect-ratio:1/1; }
+  }
 
   #share-modal {
     position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9990;
@@ -533,7 +551,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v2.02</span>
+      <span class="sub mono" id="version-tag">v2.03</span>
     </div>
   </header>
 
@@ -581,12 +599,14 @@
     <div id="session-badge-grid"></div>
 
     <div id="result-panel">
-      <div class="headline" id="rp-headline"></div>
-      <div class="main mono" id="rp-main"></div>
-      <div class="headline" id="rp-points" style="color:var(--gold);"></div>
-      <div class="headline" id="rp-rate" style="color:var(--ink-dim);"></div>
-      <div class="legend"><span class="dot"></span>正解した国</div>
-      <div class="legend"><span class="dot default"></span>まだの国</div>
+      <div class="rp-summary">
+        <div class="headline" id="rp-headline"></div>
+        <div class="main mono" id="rp-main"></div>
+        <div class="rp-points" id="rp-points" style="color:var(--gold);"></div>
+        <div class="rp-rate" id="rp-rate"></div>
+      </div>
+      <div class="flags-grid" id="rp-flags-grid"></div>
+      <button class="ctl" id="rp-skip-btn">演出をスキップ</button>
       <div class="overlay-controls">
         <button class="primary" id="rp-retry-btn">もう一度</button>
         <button class="ctl" id="rp-share-btn">結果をシェア</button>
@@ -894,7 +914,6 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 </script>
 <script src="capital-flags-data-1.js"></script>
 <script src="capital-flags-data-2.js"></script>
-<script src="capital-flags-data-3.js"></script>
 <script>
 (function(){
   "use strict";
@@ -2578,6 +2597,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     timeDisplay.textContent = (state.mode === "countdown" || state.mode === "hint") ? fmtTime(state.timeLeft) : "00:00";
 
     overlay.classList.add('hidden');
+    if(resultRevealTimer){ clearTimeout(resultRevealTimer); resultRevealTimer = null; }
     resultPanel.classList.remove('show');
     document.getElementById('bonus-status').style.display = 'none';
     document.getElementById('dobon-status').style.display = 'none';
@@ -2678,6 +2698,64 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
 
     resultPanel.classList.add('show');
+    renderResultReveal();
+  }
+
+  // ---------- シングルプレイの結果画面（対戦結果と同じく、旗が1個ずつ増えてく演出）----------
+  let resultRevealTimer = null;
+  let skipResultAnimation = null;
+  function renderResultReveal(){
+    const flagsGrid = document.getElementById('rp-flags-grid');
+    flagsGrid.innerHTML = '';
+    if(resultRevealTimer){ clearTimeout(resultRevealTimer); resultRevealTimer = null; }
+
+    // 回答した順番（時系列）そのままダカラ、既にstate.answeredFeaturesに正解順で入ってるヨ
+    const log = state.answeredFeatures.slice();
+
+    function appendOne(feature){
+      const props = feature.properties;
+      const code = (props.cca2 || '').toLowerCase();
+      const url = state.quizType === 'capital' ? capitalBadgeUrl(props) : (code ? ('https://flagcdn.com/' + code + '.svg') : '');
+      if(!url) return;
+      const name = state.quizType === 'capital'
+        ? ((typeof CAPITAL_DATA !== 'undefined' && CAPITAL_DATA[props.name_ja]) ? CAPITAL_DATA[props.name_ja].name : props.name_ja)
+        : props.name_ja;
+      const isEmblem = state.quizType === 'capital' && capitalBadgeIsEmblem(props);
+      const isDobon = state.dobonEnabled && state.dobonFeature === feature;
+      const bonusEntry = state.bonusEnabled ? state.bonusSet.find(b => b.feature === feature) : null;
+
+      const img = document.createElement('img');
+      img.src = url; img.alt = name; img.title = name; img.loading = 'lazy';
+      attachImgRetry(img, url);
+      if(isEmblem) img.classList.add('badge-emblem');
+      if(isDobon) img.classList.add('kind-dobon');
+      else if(bonusEntry) img.classList.add('kind-bonus');
+      img.addEventListener('click', () => {
+        document.getElementById('flag-zoom-img').src = url;
+        document.getElementById('flag-zoom-img').alt = name;
+        document.getElementById('flag-zoom-name').textContent = name;
+        document.getElementById('flag-zoom-sub').textContent = isDobon ? 'ドボン' : (bonusEntry ? 'ボーナス' : props.name_ja);
+        document.getElementById('flag-zoom-modal').classList.add('show');
+      });
+      flagsGrid.appendChild(img);
+    }
+
+    function revealNext(i){
+      if(i >= log.length){ resultRevealTimer = null; return; }
+      appendOne(log[i]);
+      resultRevealTimer = setTimeout(() => revealNext(i + 1), 180);
+    }
+
+    function skipToEnd(){
+      if(resultRevealTimer){ clearTimeout(resultRevealTimer); resultRevealTimer = null; }
+      flagsGrid.innerHTML = '';
+      log.forEach(appendOne);
+    }
+    skipResultAnimation = skipToEnd;
+
+    if(log.length){
+      revealNext(0);
+    }
   }
 
   // ---------- 対戦モード(Supabase Realtime) ----------
@@ -2785,6 +2863,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('dobon-status').style.display = 'none';
     document.getElementById('bonus-status').style.display = 'none';
     document.body.classList.remove('playing');
+    if(resultRevealTimer){ clearTimeout(resultRevealTimer); resultRevealTimer = null; }
     resultPanel.classList.remove('show');
     if(vsState.channel && sb){ sb.removeChannel(vsState.channel); vsState.channel = null; }
     vsStopPolling();
@@ -3669,7 +3748,13 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   });
 
   overlayStartBtn.addEventListener('click', startGame);
-  rpRetryBtn.addEventListener('click', startGame);
+  rpRetryBtn.addEventListener('click', () => {
+    if(resultRevealTimer){ clearTimeout(resultRevealTimer); resultRevealTimer = null; }
+    startGame();
+  });
+  document.getElementById('rp-skip-btn').addEventListener('click', () => {
+    if(typeof skipResultAnimation === 'function') skipResultAnimation();
+  });
 
   const MODE_LABELS = { countdown: '制限時間モード', timeattack: '時間無制限', hint: 'ヒントモード' };
   document.getElementById('rp-share-btn').addEventListener('click', () => {
@@ -3845,6 +3930,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   updateGalleryBadge();
 
   rpBackBtn.addEventListener('click', () => {
+    if(resultRevealTimer){ clearTimeout(resultRevealTimer); resultRevealTimer = null; }
     resultPanel.classList.remove('show');
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';

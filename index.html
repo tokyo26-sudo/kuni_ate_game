@@ -551,7 +551,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v2.04</span>
+      <span class="sub mono" id="version-tag">v2.06</span>
     </div>
   </header>
 
@@ -776,6 +776,9 @@
           <li>🚁ボタン：タップで遠くの国へジャンプ（ドラッグで好きな位置に移動できるダカラ）</li>
           <li>🙈ボタン：国旗表示モード中、他の国旗を一時的に隠せるヨ（国旗表示モードON時のみ表示）</li>
         </ul>
+
+        <h3>🏁 結果画面</h3>
+        <div class="desc" style="font-size:13px;">ゲーム終了後、正解した国（または首都）の旗が答えた順番にズラッとポップインしてくるダカラ。旗はクリックで拡大表示もできるヨ。数が多い時はスクロールで全部見れるダカラ、「演出をスキップ」ボタンを押せば一気に全部表示することもできるヨ。</div>
 
         <h3>🏳️ 国旗図鑑</h3>
         <div class="desc" style="font-size:13px;">正解した国の国旗はコレクションされていくダカラ。タイトル画面の「国旗図鑑」から確認・拡大表示も可能ダヨ。</div>
@@ -1539,6 +1542,44 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
   answerInput.addEventListener('input', playTypeSound);
 
+  // 正解した時に鳴らす「ポコッ」って効果音ダカラ。市区町村当てゲームの方から移植したヨ。
+  // タイピング音と同じtypeAudioCtx・同じON/OFF設定（typesound-select）を使い回すダカラ、
+  // タイピング音をOFFにしてる時はコッチも鳴らないヨ
+  function playCorrectSound(){
+    if(document.getElementById('typesound-select').value === 'off') return;
+    try {
+      if(!typeAudioCtx) typeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if(typeAudioCtx.state === 'suspended') typeAudioCtx.resume();
+      const t = typeAudioCtx.currentTime;
+
+      // 「ポコッ」というピッチが上がる柔らかい音（本体）
+      const main = typeAudioCtx.createOscillator();
+      main.type = 'sine';
+      main.frequency.setValueAtTime(220, t);
+      main.frequency.exponentialRampToValueAtTime(520, t + 0.07);
+      const mainGain = typeAudioCtx.createGain();
+      mainGain.gain.setValueAtTime(0.0001, t);
+      mainGain.gain.exponentialRampToValueAtTime(0.3, t + 0.015);
+      mainGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      main.connect(mainGain).connect(typeAudioCtx.destination);
+      main.start(t);
+      main.stop(t + 0.18);
+
+      // 明るさを足すオクターブ上の倍音（控えめ音量）
+      const harm = typeAudioCtx.createOscillator();
+      harm.type = 'sine';
+      harm.frequency.setValueAtTime(440, t);
+      harm.frequency.exponentialRampToValueAtTime(1040, t + 0.07);
+      const harmGain = typeAudioCtx.createGain();
+      harmGain.gain.setValueAtTime(0.0001, t);
+      harmGain.gain.exponentialRampToValueAtTime(0.1, t + 0.015);
+      harmGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      harm.connect(harmGain).connect(typeAudioCtx.destination);
+      harm.start(t);
+      harm.stop(t + 0.16);
+    } catch(err){ /* 音が鳴らせない環境でも、ゲーム自体は問題なく続けられるようにするダカラ */ }
+  }
+
   // 入力パネルを画面上部に固定したダカラ、キーボードを追いかけて位置調整する必要はナクなったヨ。
   // ソレデモiOS Safari系は、入力欄にフォーカスするとページ自体を勝手にスクロールして持ち上げちゃうカラ、
   // ソレダケ毎回打ち消しておくネ（地図がズレて見えるのを防ぐダカラ）
@@ -1915,6 +1956,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         return;
       }
       feature.properties.__correct = true;
+      playCorrectSound();
       addToFlagCollection(feature.properties.cca2, feature.properties.name_ja);
       if(state.quizType === 'capital'){
         addToCapitalFlagCollection(feature.properties.name_ja);

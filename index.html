@@ -551,7 +551,7 @@
     <div class="brand">
       <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
       <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v2.06</span>
+      <span class="sub mono" id="version-tag">v2.08</span>
     </div>
   </header>
 
@@ -698,11 +698,11 @@
           </div>
           <div class="overlay-card-row">
             <select id="typesound-select">
-              <option value="off" selected>タイプ音: なし</option>
+              <option value="off">タイプ音: なし</option>
               <option value="soft">タイプ音: コトッ</option>
               <option value="mecha">タイプ音: カタカタ</option>
               <option value="pop">タイプ音: ポコッ</option>
-              <option value="click">タイプ音: カチカチ</option>
+              <option value="click" selected>タイプ音: カチカチ</option>
             </select>
           </div>
         </div>
@@ -933,7 +933,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "スリランカ": { name: "スリジャヤワルダナプラコッテ", aliases: "コッテ, コロンボ", lat: 6.89, lng: 79.9, en: "Sri Jayawardenepura Kotte", zh: "斯里贾亚瓦德纳普拉科特", ko: "스리자야와르데네푸라코테" },
     "タイ": { name: "バンコク", aliases: "クルンテープ・マハナコーン・アモーンラッタナコーシン・マヒンタラーユッタヤー・マハーディロック・ポップ・ノッパラット・ラーチャタニーブリーロム・ウドムラーチャニウェートマハーサターン・アモーンピマーン・アワターンサティット・サッカタッティヤウィサヌカムプラシット, クルンテープマハナコーンアモーンラッタナコーシンマヒンタラーユッタヤーマハーディロックポップノッパラットラーチャタニーブリーロムウドムラーチャニウェートマハーサターンアモーンピマーンアワターンサティットサッカタッティヤウィサヌカムプラシット", lat: 13.75, lng: 100.5, en: "Bangkok", zh: "曼谷", ko: "방콕" },
     "タジキスタン": { name: "ドゥシャンベ", aliases: "", lat: 38.54, lng: 68.78, en: "Dushanbe", zh: "杜尚别", ko: "두샨베" },
-    "トルクメニスタン": { name: "アシガバット", aliases: "", lat: 37.95, lng: 58.38, en: "Ashgabat", zh: "阿什哈巴德", ko: "아시가바트" },
+    "トルクメニスタン": { name: "アシガバット", aliases: "アシガバード, アシガバッド, アシュガバット, アシュガバード, アシハバット, アシハバート", lat: 37.95, lng: 58.38, en: "Ashgabat", zh: "阿什哈巴德", ko: "아시가바트" },
     "ネパール": { name: "カトマンズ", aliases: "", lat: 27.72, lng: 85.32, en: "Kathmandu", zh: "加德满都", ko: "카트만두" },
     "バングラデシュ": { name: "ダッカ", aliases: "", lat: 23.81, lng: 90.41, en: "Dhaka", zh: "达卡", ko: "다카" },
     "パキスタン": { name: "イスラマバード", aliases: "", lat: 33.68, lng: 73.05, en: "Islamabad", zh: "伊斯兰堡", ko: "이슬라마바드" },
@@ -961,7 +961,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "ナウル": { name: "ヤレン", aliases: "", lat: -0.55, lng: 166.92, en: "Yaren", zh: "亚伦", ko: "야렌" },
     "ニュージーランド": { name: "ウェリントン", aliases: "", lat: -41.29, lng: 174.78, en: "Wellington", zh: "惠灵顿", ko: "웰링턴" },
     "バヌアツ": { name: "ポートビラ", aliases: "", lat: -17.73, lng: 168.32, en: "Port Vila", zh: "维拉港", ko: "포트빌라" },
-    "パプアニューギニア": { name: "ポートモレスビー", aliases: "", lat: -9.44, lng: 147.18, en: "Port Moresby", zh: "莫尔兹比港", ko: "포트모르즈비" },
+    "パプアニューギニア": { name: "ポートモレスビー", aliases: "ポートモレスビ", lat: -9.44, lng: 147.18, en: "Port Moresby", zh: "莫尔兹比港", ko: "포트모르즈비" },
     "パラオ": { name: "マルキョク", aliases: "ンゲルルムド", lat: 7.5, lng: 134.62, en: "Melekeok", zh: "梅莱凯奥克", ko: "멜레케오크" },
     "フィジー": { name: "スバ", aliases: "", lat: -18.14, lng: 178.44, en: "Suva", zh: "苏瓦", ko: "수바" },
     "マーシャル諸島": { name: "マジュロ", aliases: "", lat: 7.1, lng: 171.38, en: "Majuro", zh: "马朱罗", ko: "마주로" },
@@ -1001,7 +1001,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "ホンジュラス": { name: "テグシガルパ", aliases: "", lat: 14.1, lng: -87.22, en: "Tegucigalpa", zh: "特古西加尔巴", ko: "테구시갈파" },
     "ボリビア": { name: "スクレ", aliases: "ラパス", lat: -16.5, lng: -68.15, en: "Sucre", zh: "苏克雷", ko: "수크레" },
     "メキシコ": { name: "メキシコシティ", aliases: "", lat: 19.43, lng: -99.13, en: "Mexico City", zh: "墨西哥城", ko: "멕시코시티" },
-    "アイスランド": { name: "レイキャビク", aliases: "", lat: 64.15, lng: -21.94, en: "Reykjavik", zh: "雷克雅未克", ko: "레이캬비크" },
+    "アイスランド": { name: "レイキャビク", aliases: "レイキャヴィーク, レイキャビック, レイキャヴィク", lat: 64.15, lng: -21.94, en: "Reykjavik", zh: "雷克雅未克", ko: "레이캬비크" },
     "アイルランド": { name: "ダブリン", aliases: "", lat: 53.35, lng: -6.26, en: "Dublin", zh: "都柏林", ko: "더블린" },
     "アルバニア": { name: "ティラナ", aliases: "", lat: 41.33, lng: 19.82, en: "Tirana", zh: "地拉那", ko: "티라나" },
     "アンドラ": { name: "アンドラ・ラ・ベリャ", aliases: "", lat: 42.51, lng: 1.52, en: "Andorra la Vella", zh: "安道尔城", ko: "안도라라베야" },
@@ -1040,7 +1040,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     "モナコ": { name: "モナコ", aliases: "", lat: 43.73, lng: 7.42, en: "Monaco", zh: "摩纳哥", ko: "모나코" },
     "モルドバ": { name: "キシナウ", aliases: "", lat: 47.01, lng: 28.86, en: "Chisinau", zh: "基希讷乌", ko: "키시너우" },
     "モンテネグロ": { name: "ポドゴリツァ", aliases: "", lat: 42.44, lng: 19.26, en: "Podgorica", zh: "波德戈里察", ko: "포드고리차" },
-    "ラトビア": { name: "リガ", aliases: "", lat: 56.95, lng: 24.11, en: "Riga", zh: "里加", ko: "리가" },
+    "ラトビア": { name: "リガ", aliases: "リーガ", lat: 56.95, lng: 24.11, en: "Riga", zh: "里加", ko: "리가" },
     "リトアニア": { name: "ビリニュス", aliases: "", lat: 54.69, lng: 25.28, en: "Vilnius", zh: "维尔纽斯", ko: "빌뉴스" },
     "リヒテンシュタイン": { name: "ファドゥーツ", aliases: "", lat: 47.14, lng: 9.52, en: "Vaduz", zh: "瓦杜兹", ko: "파두츠" },
     "ルクセンブルク": { name: "ルクセンブルク", aliases: "", lat: 49.61, lng: 6.13, en: "Luxembourg", zh: "卢森堡市", ko: "룩셈부르크" },

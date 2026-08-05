@@ -52,22 +52,23 @@
 
   #app { display:flex; flex-direction:column; height:100vh; height:100dvh; }
 
-  /* ---------- Header ---------- */
-  header {
-    display:flex; align-items:center; gap:20px;
-    padding:12px 20px; background:var(--bg-panel);
-    border-bottom:1px solid var(--line);
-    flex-wrap:wrap; z-index:20; position:relative;
-  }
-  .brand { display:flex; align-items:baseline; gap:8px; margin-right:auto; }
-  .brand .mark { color:var(--gold); font-weight:900; font-size:22px; letter-spacing:0.02em; }
-  .brand .sub { color:var(--ink-dim); font-size:11px; letter-spacing:0.15em; }
-  #header-controls { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
-  @media (max-width: 720px){
-    body.playing header { display:none; }
-  }
-  #version-tag { color:var(--gold-dim); font-weight:700; background:var(--bg-panel-2);
+  /* ---------- タイトル画面のブランド表示（タイトル＋バージョン） ---------- */
+  #overlay-brand { display:flex; align-items:baseline; justify-content:center; gap:8px; margin-bottom:4px; }
+  #overlay-brand-title { color:var(--gold); font-weight:900; font-size:20px; letter-spacing:0.02em; }
+  #overlay-brand-version { color:var(--ink-dim); font-size:11px; background:var(--bg-panel-2);
     padding:2px 8px; border-radius:999px; border:1px solid var(--line); letter-spacing:0.05em; }
+
+  /* ---------- ゲーム中の控えめなバージョンタグ（クリックでタイトルに戻れるヨ） ---------- */
+  #logo-reset {
+    position:absolute; left:10px; bottom:10px; z-index:15;
+    color:var(--ink-dim); font-size:10px; opacity:0.55; cursor:pointer;
+    background:var(--bg-panel-2); padding:2px 7px; border-radius:999px; border:1px solid var(--line);
+    transition:opacity .15s ease;
+  }
+  #logo-reset:hover { opacity:1; }
+  body.playing #logo-reset { display:block; }
+  body:not(.playing) #logo-reset { display:none; }
+
   #dobon-toggle-label, #bonus-toggle-label, #flagmode-toggle-label { font-size:13px; }
 
   .stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.1; }
@@ -265,7 +266,7 @@
   /* ---------- Overlay (start / result) ---------- */
   #overlay {
     position:absolute; inset:0; background:var(--overlay-bg);
-    display:flex; align-items:center; justify-content:center; z-index:9000;
+    display:flex; align-items:center; justify-content:safe center; z-index:9000;
     flex-direction:column; gap:20px; padding:20px; text-align:center;
     overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
@@ -547,13 +548,6 @@
 </head>
 <body class="theme-light">
 <div id="app">
-  <header>
-    <div class="brand">
-      <span class="mark" id="logo-reset" style="cursor:pointer;">世界の国名当てゲーム</span>
-      <span class="sub mono">COUNTRY NAME QUIZ — PROTOTYPE</span>
-      <span class="sub mono" id="version-tag">v2.14</span>
-    </div>
-  </header>
 
   <div id="map-wrap">
     <button class="ctl" id="giveup-btn" style="display:none; position:absolute; top:16px; right:16px; z-index:9400; background:var(--red); color:#2a0d07; border-color:var(--red); font-weight:700;">ギブアップ</button>
@@ -588,6 +582,8 @@
     <div id="toast"></div>
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
+
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.16</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -627,8 +623,11 @@
     </div>
 
     <div id="overlay">
+      <div id="overlay-brand">
+        <span id="overlay-brand-title">世界の国名当てゲーム</span>
+        <span id="overlay-brand-version" class="mono">v2.16</span>
+      </div>
       <h1>COUNTRY NAME QUIZ</h1>
-      <h2>準備はいい？</h2>
       <div class="desc">
         地図上の国をクリックして、国名を入力してクダサイ。<br>
         下のメニューでモードと地域、制限時間を選んでからスタートしてクダサイ。

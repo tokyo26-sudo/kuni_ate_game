@@ -589,7 +589,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.26</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.28</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -631,7 +631,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.26</span>
+        <span id="overlay-brand-version" class="mono">v2.28</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -3272,7 +3272,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         vsHandleMatchFinished();
       }
       if(!vsState.matchTransitionDone){
-        const finishPlayerIds = vsState.players.filter(p => p.role === 'player').map(p => p.id);
+        // 終了後もポーリングで更新され続けるvsState.playersじゃなくて、
+        // 試合開始時に固定したスナップショットを使うダカラ（コッチの方が安定するヨ）
+        const finishPlayerIds = (vsState.matchPlayerIds && vsState.matchPlayerIds.length)
+          ? vsState.matchPlayerIds
+          : vsState.players.filter(p => p.role === 'player').map(p => p.id);
         const acks = settings.finishAcks || {};
         const bothAcked = finishPlayerIds.length > 0 && finishPlayerIds.every(id => acks[id]);
         const timedOut = vsState.finishDeadline && Date.now() > vsState.finishDeadline;
@@ -3530,7 +3534,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     });
 
     vsUpdateScoreboard();
-    if(claim.player_id === vsState.myPlayerId){
+    // ゲームが終わった後まで正解トーストが出続けるのは見た目上ヨクナイカラ、
+    // 試合が進行中の時ダケ出すようにするヨ
+    if(claim.player_id === vsState.myPlayerId && vsState.playing){
       if(isDobon){
         showToast(flag + " " + claim.country_name + " ドボンだったダカラ！自分のスコアが1マイナスになるヨ");
       } else if(bonusEntry){
@@ -3661,6 +3667,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsState.matchTransitionDone = false;
     vsState.finishGateShown = false;
     vsState.finishDeadline = null;
+    // 「両者が結果を見る準備OKか」の判定で使うプレイヤーID一覧は、試合開始時点でココで固定するダカラ。
+    // 終了後にvsState.playersがポーリングで更新され続けてズレたりしても、コッチは影響受けないヨ
+    vsState.matchPlayerIds = vsState.players.filter(p => p.role === 'player').map(p => p.id);
     vsState.regionFilter = settings.region || "all";
     resetLayers();
     COUNTRY_GEOJSON.features.forEach(f => { delete f.properties.__claimedBy; });

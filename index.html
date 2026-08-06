@@ -152,7 +152,7 @@
   #answer-panel.show { transform:translate(-50%,0) scale(1); opacity:1; pointer-events:auto; }
   @media (max-width: 720px){
     #answer-panel {
-      top:60px; bottom:auto; min-width:0;
+      top:104px; bottom:auto; min-width:0;
       left:56px; right:12px; width:auto;
       transform:translateY(-8px) scale(0.94);
     }
@@ -172,6 +172,7 @@
   #session-badge-row::-webkit-scrollbar { display:none; }
   body.playing #session-badge-row.has-items { display:flex; gap:6px; align-items:center; }
   body.vs-mode #session-badge-row { display:none !important; }
+  body.vs-mode #score-stat, body.vs-mode #points-stat { display:none !important; }
   #session-badge-row img {
     width:32px; height:32px; flex:none; border-radius:6px;
     border:1px solid var(--line); object-fit:contain;
@@ -568,11 +569,11 @@
         <div class="label">ボーナス</div>
         <div class="value mono" id="bonus-status-value" style="color:var(--teal); font-size:11px; white-space:normal; line-height:1.5;"></div>
       </div>
-      <div class="stat">
+      <div class="stat" id="score-stat">
         <div class="label">SCORE</div>
         <div class="value mono" id="score-display">0 / 0</div>
       </div>
-      <div class="stat">
+      <div class="stat" id="points-stat">
         <div class="label">POINTS</div>
         <div class="value mono" id="points-display" style="color:var(--gold);">0</div>
       </div>
@@ -588,7 +589,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.21</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.25</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -630,7 +631,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.21</span>
+        <span id="overlay-brand-version" class="mono">v2.25</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -819,14 +820,14 @@
           </div>
         </div>
         <div class="overlay-card">
-          <h3>自分だけのハンデ設定（相手には見えないヨ）</h3>
+          <h3>自分のハンデ設定（相手にも見えるダカラ）</h3>
           <label class="overlay-toggle-row">
             <input type="checkbox" id="vs-handicap-flagmode-join" style="accent-color:var(--gold-dim);">
-            選択した国だけ国旗表示
+            🚩選択した国だけ国旗表示
           </label>
           <label class="overlay-toggle-row">
             <input type="checkbox" id="vs-handicap-hint-join" style="accent-color:var(--teal);">
-            じわじわヒントあり
+            ❓じわじわヒントあり
           </label>
         </div>
         <button class="primary" id="vs-join-btn" style="width:100%;">入室する</button>
@@ -867,14 +868,14 @@
           </label>
         </div>
         <div class="overlay-card">
-          <h3>自分だけのハンデ設定（相手には見えないヨ）</h3>
+          <h3>自分のハンデ設定（相手にも見えるダカラ）</h3>
           <label class="overlay-toggle-row">
             <input type="checkbox" id="vs-handicap-flagmode-create" style="accent-color:var(--gold-dim);">
-            選択した国だけ国旗表示
+            🚩選択した国だけ国旗表示
           </label>
           <label class="overlay-toggle-row">
             <input type="checkbox" id="vs-handicap-hint-create" style="accent-color:var(--teal);">
-            じわじわヒントあり
+            ❓じわじわヒントあり
           </label>
         </div>
         <button class="primary" id="vs-create-confirm-btn" style="width:100%;">部屋を作成</button>
@@ -3103,6 +3104,24 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     }
   }
 
+  // ハンデ設定は「相手にも見える」仕様（フェアプレイのためダカラ）、
+  // 部屋の共有設定(rooms.settings.handicaps)に、自分の分だけ書き込んで同期するヨ
+  async function vsSyncMyHandicap(){
+    if(!sb || !vsState.roomId || !vsState.myPlayerId) return;
+    try {
+      const { data: room } = await sb.from('rooms').select().eq('id', vsState.roomId).single();
+      const settings = Object.assign({}, room.settings);
+      const handicaps = Object.assign({}, settings.handicaps || {});
+      handicaps[vsState.myPlayerId] = {
+        flagMode: !!vsState.myHandicap.flagMode,
+        hintReveal: !!vsState.myHandicap.hintReveal,
+      };
+      settings.handicaps = handicaps;
+      vsState.roomSettings = settings;
+      await sb.from('rooms').update({ settings }).eq('id', vsState.roomId);
+    } catch(err){ /* 失敗しても、後で再入室したりポーリングで拾われるダカラ気にしないヨ */ }
+  }
+
   async function vsJoinAsPlayer(name){
     try {
       const { data: existing, error: listErr } = await sb.from('players').select().eq('room_id', vsState.roomId);
@@ -3117,6 +3136,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       vsState.myPlayerId = player.id;
       vsState.myRole = role;
       vsState.myName = name;
+      if(role === 'player') await vsSyncMyHandicap();
       vsEnterRoomScreen();
     } catch(err){
       vsSetStatus('参加失敗ダカラ: ' + (err.message || err));
@@ -3247,8 +3267,22 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const settings = room.settings || {};
     vsState.roomSettings = settings;
 
-    if(room.status === 'finished' && vsState.playing){
-      vsFinishMatch();
+    if(room.status === 'finished'){
+      if(vsState.playing){
+        vsHandleMatchFinished();
+      }
+      if(!vsState.matchTransitionDone){
+        const finishPlayerIds = vsState.players.filter(p => p.role === 'player').map(p => p.id);
+        const acks = settings.finishAcks || {};
+        const bothAcked = finishPlayerIds.length > 0 && finishPlayerIds.every(id => acks[id]);
+        const timedOut = vsState.finishDeadline && Date.now() > vsState.finishDeadline;
+        // 観戦者はソモソモ同意不要（vsHandleMatchFinishedの中で自動遷移するダカラ）、
+        // プレイヤーは「自分もゲーム終了画面を見た後」ダケ、コッチの判定を有効にするヨ
+        if((bothAcked || timedOut) && (vsState.myRole !== 'player' || vsState.finishGateShown)){
+          vsState.matchTransitionDone = true;
+          vsCompleteMatchTransition();
+        }
+      }
       return;
     }
     if(room.status === 'playing'){
@@ -3400,6 +3434,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       phase: 'reveal',
       revealAcks: {},
       readyAcks: {},
+      finishAcks: {},
       startAt: null,
     });
     vsState.roomSettings = newSettings;
@@ -3523,9 +3558,19 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     document.getElementById('dobon-status').style.display = '';
     const labelEl = document.querySelector('#dobon-status .label');
     if(labelEl) labelEl.textContent = 'スコア';
-    document.getElementById('dobon-status-value').innerHTML = players.map(p =>
-      '<span style="color:' + (p.color || '#888') + '">' + p.name + ': ' + (counts[p.id] || 0) + '</span>'
-    ).join(' ／ ');
+    const handicaps = (vsState.roomSettings && vsState.roomSettings.handicaps) || {};
+    document.getElementById('dobon-status-value').innerHTML = players.map(p => {
+      // ハンデ設定は今は「相手にも見える」仕様（フェアプレイのためダカラ）、
+      // 部屋の設定(roomSettings.handicaps)に同期された内容から、全員分のアイコンを出すヨ
+      const h = handicaps[p.id];
+      let icons = '';
+      if(h){
+        if(h.flagMode) icons += '🚩';
+        if(h.hintReveal) icons += '❓';
+        if(icons) icons += ' ';
+      }
+      return '<span style="color:' + (p.color || '#888') + '">' + icons + p.name + ': ' + (counts[p.id] || 0) + '</span>';
+    }).join(' ／ ');
   }
 
   function vsCheckAllClaimed(){
@@ -3607,6 +3652,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
   function vsStartMatch(settings){
     vsState.playing = true;
+    vsState.matchTransitionDone = false;
+    vsState.finishGateShown = false;
+    vsState.finishDeadline = null;
     vsState.regionFilter = settings.region || "all";
     resetLayers();
     COUNTRY_GEOJSON.features.forEach(f => { delete f.properties.__claimedBy; });
@@ -3703,9 +3751,56 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
 
   function vsFinishMatch(){
+    vsHandleMatchFinished();
+  }
+
+  // 試合終了を検知したらスグ呼ぶダカラ。タイマーを止めて、ゲーム画面を片付けて、
+  // プレイヤーには「ゲーム終了！」を即座ニ見せるヨ（観戦者は同意不要でソノまま結果画面へ）
+  function vsHandleMatchFinished(){
     if(state.timer){ clearInterval(state.timer); state.timer = null; }
     vsState.playing = false;
     state.running = false;
+    document.getElementById('vs-force-end-btn').style.display = 'none';
+    closePanel();
+    if(vsState.myRole !== 'player'){
+      vsShowFinishFlash(() => vsCompleteMatchTransition());
+      return;
+    }
+    vsShowMatchFinishedGate();
+  }
+
+  // プレイヤーに「ゲーム終了ダカラ！」を即座に見せて、ボタンを押してもらうダカラ。
+  // 両方が押す（か、15秒経つ）マデ結果画面ニは進まないヨ
+  // （片方の画面だけ止まったまま、が起きないようにするための仕組みダカラ）
+  function vsShowMatchFinishedGate(){
+    if(vsState.finishGateShown) return;
+    vsState.finishGateShown = true;
+    vsState.finishDeadline = Date.now() + 15000;
+    let overlay = document.getElementById('vs-finish-gate-overlay');
+    if(!overlay){
+      overlay = document.createElement('div');
+      overlay.id = 'vs-finish-gate-overlay';
+      overlay.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:rgba(0,0,0,0.8); color:#fff; text-align:center; padding:24px; font-family:inherit;';
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML =
+      '<div style="font-size:36px; font-weight:900;">🏁 ゲーム終了ダカラ！</div>' +
+      '<div id="vs-finish-gate-sub" style="font-size:14px; opacity:0.85;">結果を見る準備ができたら押してネ</div>' +
+      '<button class="primary" id="vs-finish-gate-btn">結果を見る</button>';
+    overlay.style.display = 'flex';
+    document.getElementById('vs-finish-gate-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('vs-finish-gate-btn');
+      if(btn){ btn.disabled = true; btn.textContent = '相手を待ってるダカラ…'; }
+      const sub = document.getElementById('vs-finish-gate-sub');
+      if(sub) sub.textContent = '相手が結果を見る準備をするのを待ってるダカラ…';
+      await vsAckField('finishAcks', null);
+    }, { once: true });
+  }
+
+  // ゲーム終了ボタンを両方が押した（か、タイムアウトした）後、実際に結果画面へ切り替える処理ダカラ
+  function vsCompleteMatchTransition(){
+    const overlay = document.getElementById('vs-finish-gate-overlay');
+    if(overlay) overlay.style.display = 'none';
     state.vsMode = false;
     // ポーリングを止めないと、「終了しました」のDB書き込みが間に合ってない一瞬のスキに
     // 古い「プレイ中」情報を拾って試合を勝手に再開しちゃうコトがあったカラ、コレが今回の本命バグダヨ
@@ -3713,15 +3808,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(vsState.channel && sb){ sb.removeChannel(vsState.channel); vsState.channel = null; }
     document.body.classList.remove('playing');
     document.body.classList.remove('vs-mode');
-    document.getElementById('vs-force-end-btn').style.display = 'none';
-    closePanel(); // コレが抜けてたカラ、試合終了しても入力欄が開きっぱなしになってたんダヨ
     vsHideSimpleOverlays();
     vsState.revealShown = false;
     vsState.standbyShown = false;
-    vsShowFinishFlash(() => {
-      showOverlayById('vs-result-overlay');
-      vsRenderResultAnimated();
-    });
+    vsState.finishGateShown = false;
+    showOverlayById('vs-result-overlay');
+    vsRenderResultAnimated();
   }
 
   // 「勝敗の決め方」だけをココに切り出しとくダカラ。今は「取った国の数（ドボンは-1）」ダケド、

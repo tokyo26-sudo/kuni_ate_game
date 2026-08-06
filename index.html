@@ -583,7 +583,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.19</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.20</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -625,7 +625,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.19</span>
+        <span id="overlay-brand-version" class="mono">v2.20</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -2246,6 +2246,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       f.properties.__hintShownChars = 0;
       f.properties.__hintCirclesShown = false;
       f.properties.__hintRevealOrder = null;
+      f.properties.__hintRevealOrderMode = null;
       const layer = layers[f.properties.name_ja];
       if(layer){
         layer.setStyle(styleFor(f, false));
@@ -2329,19 +2330,26 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     const props = feature.properties;
     if(typeof props.__hintShownChars !== 'number') props.__hintShownChars = 0;
     if(typeof props.__hintCirclesShown !== 'boolean') props.__hintCirclesShown = false;
-    // 出現順：0番目(頭文字)は固定、残りはシャッフルするダカラ。一度決めたらfeature側に保存して使い回すヨ
-    if(!Array.isArray(props.__hintRevealOrder) || props.__hintRevealOrder.length !== total){
-      const rest = [];
-      for(let i = 1; i < total; i++) rest.push(i);
-      for(let i = rest.length - 1; i > 0; i--){
-        const j = Math.floor(Math.random() * (i + 1));
-        const tmp = rest[i]; rest[i] = rest[j]; rest[j] = tmp;
-      }
-      props.__hintRevealOrder = total > 0 ? [0].concat(rest) : [];
-    }
-    const order = props.__hintRevealOrder;
     // ヒントモード（練習用）と、対戦モードの「じわじわヒントあり」ハンデは、どっちも即座に頭文字まで見えるようにするダカラ
     const isFast = state.hintPractice || (state.vsMode && vsState.myHandicap.hintReveal);
+    // 出現順：練習モード・対戦ハンデは頭から順番のママ、普通モードダケ「頭文字固定＋2文字目以降ランダム」にするダカラ
+    if(!Array.isArray(props.__hintRevealOrder) || props.__hintRevealOrder.length !== total || props.__hintRevealOrderMode !== (isFast ? 'seq' : 'random')){
+      if(isFast){
+        const seq = [];
+        for(let i = 0; i < total; i++) seq.push(i);
+        props.__hintRevealOrder = seq;
+      } else {
+        const rest = [];
+        for(let i = 1; i < total; i++) rest.push(i);
+        for(let i = rest.length - 1; i > 0; i--){
+          const j = Math.floor(Math.random() * (i + 1));
+          const tmp = rest[i]; rest[i] = rest[j]; rest[j] = tmp;
+        }
+        props.__hintRevealOrder = total > 0 ? [0].concat(rest) : [];
+      }
+      props.__hintRevealOrderMode = isFast ? 'seq' : 'random';
+    }
+    const order = props.__hintRevealOrder;
     // 「◯◯◯」が出るマデは、練習用・普通モードどっちも即座ダヨ
     const circleDelay = 0;
     // 「◯◯◯」→最初の1文字が見えるマデは、練習用は即座、普通モードは3秒ダヨ
@@ -2913,6 +2921,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       f.properties.__hintShownChars = 0;
       f.properties.__hintCirclesShown = false;
       f.properties.__hintRevealOrder = null;
+      f.properties.__hintRevealOrderMode = null;
       delete f.properties.__claimedBy;
       const layer = layers[f.properties.name_ja];
       if(layer){ layer.setStyle(styleFor(f, false)); layer.unbindTooltip(); }

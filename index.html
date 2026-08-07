@@ -28,6 +28,24 @@
     --overlay-bg: rgba(11,22,34,0.96);
     --active-ring: #e8a33d;
   }
+  /* ---------- 起動時のローディング画面（重いデータの読み込み中、画面が止まってるダケじゃないコトを伝えるヨ） ---------- */
+  #boot-loading{
+    position:fixed; inset:0; z-index:99999;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    background:#0b1622; color:#eae3d3; font-family:'Zen Kaku Gothic New', sans-serif;
+  }
+  #boot-loading .boot-spinner{
+    width:44px; height:44px; border-radius:50%;
+    border:4px solid rgba(232,224,208,0.18); border-top-color:#e8a33d;
+    animation: boot-spin 0.9s linear infinite;
+  }
+  #boot-loading .boot-text{ font-size:15px; font-weight:700; letter-spacing:0.05em; }
+  #boot-loading .boot-dots span{ display:inline-block; opacity:0.15; animation: boot-blink 1.4s infinite; }
+  #boot-loading .boot-dots span:nth-child(1){ animation-delay:0s; }
+  #boot-loading .boot-dots span:nth-child(2){ animation-delay:0.2s; }
+  #boot-loading .boot-dots span:nth-child(3){ animation-delay:0.4s; }
+  @keyframes boot-spin{ to{ transform:rotate(360deg); } }
+  @keyframes boot-blink{ 0%,80%,100%{ opacity:0.15; } 40%{ opacity:1; } }
   body.theme-light{
     --bg-deep: #eef2f5;
     --bg-panel: #ffffff;
@@ -554,6 +572,10 @@
 </style>
 </head>
 <body class="theme-light">
+<div id="boot-loading">
+  <div class="boot-spinner"></div>
+  <div class="boot-text">せつぞくちゅう<span class="boot-dots"><span>・</span><span>・</span><span>・</span></span></div>
+</div>
 <div id="app">
 
   <div id="map-wrap">
@@ -590,7 +612,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.40</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.41</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -632,7 +654,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.40</span>
+        <span id="overlay-brand-version" class="mono">v2.41</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -4383,6 +4405,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     console.log(JSON.stringify(info, null, 2));
     return info;
   };
+
+  // 起動が終わって画面の準備ができたカラ、ローディング画面を消すヨ
+  const bootLoadingEl = document.getElementById('boot-loading');
+  if(bootLoadingEl) bootLoadingEl.remove();
 
 })();
 </script>

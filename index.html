@@ -590,7 +590,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.35</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.36</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -632,7 +632,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.35</span>
+        <span id="overlay-brand-version" class="mono">v2.36</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -2946,6 +2946,10 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     toastedClaims: new Set(), // 「同じ内容のトーストは絶対に1回しか出さない」ダメ押しの保険ダヨ
     serverTimeOffset: 0, // 自分の端末の時計とサーバーの時計のズレ（コレを使って開始・終了タイミングを揃えるヨ）
     matchStartAt: null,
+    lastStartedAt: null, // 「この試合、もうvsStartMatch済みか」の目印ダカラ。playingのtrue/falseダケだと、
+                          // 終了直後の一瞬（DBへの'finished'書き込みが終わる前）に来たpolling/通知が
+                          // 「まだplaying中の情報」と誤解してvsStartMatchを二重に呼んじゃうコトがあったカラ、
+                          // コッチ（開始時刻）で「同じ試合を二度始めてないか」を確実にガードするヨ
     claimLog: [], // 結果画面の演出用に「誰が・何を・どんな種類で取ったか」を順番に記録するダカラ
     resultRevealTimer: null,
     skipResultAnimation: null,
@@ -3008,6 +3012,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(vsState.channel && sb){ sb.removeChannel(vsState.channel); vsState.channel = null; }
     vsStopPolling();
     vsState.roomId = null;
+    vsState.lastStartedAt = null;
     scoreDisplay.textContent = "0 / 0";
     pointsDisplay.textContent = "0";
     timeDisplay.textContent = "--:--";
@@ -3276,7 +3281,11 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       return;
     }
     if(room.status === 'playing'){
-      if(!vsState.playing && !vsState.countdownScheduled){
+      // 「まだplaying中の情報」に見えても、コレが自分がもう一回始めたのと同じstartAtの試合ダッタラ
+      // 二重スタートしないようにするダカラ（試合終了直後、DBへの'finished'書き込みが間に合ってない一瞬に
+      // 古いpolling/通知が届いて、終わったばっかりの試合をvsStartMatchで再スタートしちゃう不具合の対策ヨ）
+      const alreadyStartedThisMatch = settings.startAt && settings.startAt === vsState.lastStartedAt;
+      if(!vsState.playing && !vsState.countdownScheduled && !alreadyStartedThisMatch){
         vsHideSimpleOverlays();
         const startAt = settings.startAt || vsNow();
         const delay = startAt - vsNow();
@@ -3684,6 +3693,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     // コレなら、スマホでタイマーがサボられて多少ズレても、次に動いた時に正しい残り時間にちゃんと追いつくヨ
     const matchStartAt = settings.startAt || vsNow();
     vsState.matchStartAt = matchStartAt;
+    vsState.lastStartedAt = matchStartAt; // コノ試合はもう始めたヨ、って目印。同じstartAtでの二重スタートを防ぐダカラ
     vsState.matchEndAt = matchStartAt + state.timeLimit * 1000;
 
     state.timeLeft = state.timeLimit;
@@ -3936,6 +3946,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(vsState.channel && sb) sb.removeChannel(vsState.channel);
     vsStopPolling();
     vsState.roomId = null;
+    vsState.lastStartedAt = null;
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
@@ -3952,6 +3963,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     if(vsState.channel && sb) sb.removeChannel(vsState.channel);
     vsStopPolling();
     vsState.roomId = null;
+    vsState.lastStartedAt = null;
     document.getElementById('map').classList.add('map-hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('giveup-btn').style.display = 'none';
@@ -4334,6 +4346,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       players: vsState.players,
       finishAcks: vsState.roomSettings ? vsState.roomSettings.finishAcks : null,
       roomId: vsState.roomId,
+      matchStartAt: vsState.matchStartAt,
+      lastStartedAt: vsState.lastStartedAt,
+      roomSettingsStartAt: vsState.roomSettings ? vsState.roomSettings.startAt : null,
     };
     console.log(JSON.stringify(info, null, 2));
     return info;

@@ -590,7 +590,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.34</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.35</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -632,7 +632,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.34</span>
+        <span id="overlay-brand-version" class="mono">v2.35</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -4334,6 +4334,23 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       players: vsState.players,
       finishAcks: vsState.roomSettings ? vsState.roomSettings.finishAcks : null,
       roomId: vsState.roomId,
+    };
+    console.log(JSON.stringify(info, null, 2));
+    return info;
+  };
+
+  // 結果画面で旗が出ない・スコアが0になる不具合を調べる専用ダカラ
+  window.__vsResultDebug = function(){
+    const claimedFeatures = COUNTRY_GEOJSON.features.filter(f => f.properties.__claimedBy);
+    const info = {
+      claimLogLength: vsState.claimLog ? vsState.claimLog.length : null,
+      claimLogSample: vsState.claimLog ? vsState.claimLog.slice(0, 5) : null,
+      claimedFeatureCount: claimedFeatures.length,
+      claimedFeatureSample: claimedFeatures.slice(0, 5).map(f => ({
+        name: f.properties.name_ja, claimedBy: f.properties.__claimedBy,
+      })),
+      players: vsState.players,
+      myPlayerId: vsState.myPlayerId,
     };
     console.log(JSON.stringify(info, null, 2));
     return info;

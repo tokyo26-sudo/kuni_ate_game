@@ -5,10 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>世界の国名当てゲーム</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8C%8F</text></svg>">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg-deep: #0b1622;
@@ -576,6 +572,14 @@
   <div class="boot-spinner"></div>
   <div class="boot-text">せつぞくちゅう<span class="boot-dots"><span>・</span><span>・</span><span>・</span></span></div>
 </div>
+<!-- 外部ファイル(CSS/JS)の読み込みは、コノ「接続中」画面より後ろに置くダカラ。
+     <head>の中に置いてたトキは、コレラの読み込みが終わるまでブラウザが何も描画できなくて、
+     「接続中」画面が出る前に真っ白のまま止まって見えちゃう不具合があったヨ。
+     ココに置けば、「接続中」画面が確実に先に表示されてから、コッチの読み込みが始まるダカラ -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <div id="app">
 
   <div id="map-wrap">
@@ -612,7 +616,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.41</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.42</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -654,7 +658,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.41</span>
+        <span id="overlay-brand-version" class="mono">v2.42</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">

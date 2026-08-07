@@ -616,7 +616,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.42</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.43</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -658,7 +658,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.42</span>
+        <span id="overlay-brand-version" class="mono">v2.43</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -3196,8 +3196,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   }
 
   // 部屋の参加用URLとQRコードを表示するダカラ（招待する相手がURLクリックorQR読み取りだけで参加できるようにするヨ）
+  // ※QRコードは本体(index.html、重いデータ入りで数秒かかるコトがあるヨ)じゃなくて、
+  //   まず一瞬で表示できる中継ページ(loading.html)を経由させるダカラ。
+  //   コレなら「読んだ瞬間に反応が無くて止まったように見える」コトを防げるヨ
   function vsRenderJoinShare(){
-    const url = location.origin + location.pathname + '?vsjoin=' + vsState.roomCode;
+    const dir = location.pathname.replace(/[^\/]*$/, '');
+    const url = location.origin + dir + 'loading.html?vsjoin=' + vsState.roomCode;
     const urlInput = document.getElementById('vs-join-url');
     if(urlInput) urlInput.value = url;
     const qrBox = document.getElementById('vs-join-qr');

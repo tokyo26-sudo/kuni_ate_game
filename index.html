@@ -590,7 +590,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.37</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.38</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -632,7 +632,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.37</span>
+        <span id="overlay-brand-version" class="mono">v2.38</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -2867,7 +2867,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const bonusEntry = state.bonusEnabled ? state.bonusSet.find(b => b.feature === feature) : null;
 
       const img = document.createElement('img');
-      img.src = url; img.alt = name; img.title = name; img.loading = 'lazy';
+      img.src = url; img.alt = name; img.title = name;
       attachImgRetry(img, url);
       if(isEmblem) img.classList.add('badge-emblem');
       if(isDobon) img.classList.add('kind-dobon');
@@ -3880,7 +3880,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       img.src = url;
       img.alt = entry.countryName;
       img.title = entry.countryName;
-      img.loading = 'lazy';
+      // 対戦結果画面は「非表示→急に表示」って切り替わる作りダカラ、loading="lazy"だとSafariが
+      // 読み込みタイミングを見失って、旗が永久に読み込まれないコトがあったヨ。結果画面はどうせ全部見せる画面ダカラ、
+      // 後回し読み込みのメリットも無いシ、素直に即読み込みするようにするヨ
       attachImgRetry(img, url);
       if(entry.kind === 'dobon') img.classList.add('kind-dobon');
       if(entry.kind === 'bonus') img.classList.add('kind-bonus');

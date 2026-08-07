@@ -589,7 +589,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.28</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.30</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -631,7 +631,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.28</span>
+        <span id="overlay-brand-version" class="mono">v2.30</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -2942,6 +2942,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     advancingPhase: false,
     matchEndAt: null, // 対戦の残り時間は「引き算」じゃなくて、コレ（絶対終了時刻）との差分で計算するダカラ
     myHandicap: { flagMode: false, hintReveal: false }, // 自分だけのハンデ設定（相手には同期しないヨ）
+    toastedClaims: new Set(), // 「同じ内容のトーストは絶対に1回しか出さない」ダメ押しの保険ダヨ
     serverTimeOffset: 0, // 自分の端末の時計とサーバーの時計のズレ（コレを使って開始・終了タイミングを揃えるヨ）
     matchStartAt: null,
     claimLog: [], // 結果画面の演出用に「誰が・何を・どんな種類で取ったか」を順番に記録するダカラ
@@ -3272,6 +3273,9 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
         vsHandleMatchFinished();
       }
       if(!vsState.matchTransitionDone){
+        // 万が一何かの拍子でゲート画面の見た目がズレても、ポーリングの度に
+        // 正しい状態へ描画し直すダカラ、コレで「押したハズなのに戻ってる」現象を防げるヨ
+        if(vsState.finishGateShown) vsRenderMatchFinishedGate();
         // 終了後もポーリングで更新され続けるvsState.playersじゃなくて、
         // 試合開始時に固定したスナップショットを使うダカラ（コッチの方が安定するヨ）
         const finishPlayerIds = (vsState.matchPlayerIds && vsState.matchPlayerIds.length)
@@ -3535,8 +3539,12 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
 
     vsUpdateScoreboard();
     // ゲームが終わった後まで正解トーストが出続けるのは見た目上ヨクナイカラ、
-    // 試合が進行中の時ダケ出すようにするヨ
-    if(claim.player_id === vsState.myPlayerId && vsState.playing){
+    // 試合が進行中の時ダケ出すようにするヨ。
+    // 「同じ国のトースト、理由が何であれ絶対に1回しか出さない」を、__claimedByの状態と
+    // 独立したSetでダメ押し保証するダカラ（リアルタイム通知が同じ内容を重複配信してきても安全ダヨ）
+    const toastKey = claim.country_name + ':' + claim.player_id;
+    if(claim.player_id === vsState.myPlayerId && vsState.playing && !vsState.toastedClaims.has(toastKey)){
+      vsState.toastedClaims.add(toastKey);
       if(isDobon){
         showToast(flag + " " + claim.country_name + " ドボンだったダカラ！自分のスコアが1マイナスになるヨ");
       } else if(bonusEntry){
@@ -3667,6 +3675,8 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     vsState.matchTransitionDone = false;
     vsState.finishGateShown = false;
     vsState.finishDeadline = null;
+    vsState.myFinishAcked = false;
+    vsState.toastedClaims = new Set();
     // 「両者が結果を見る準備OKか」の判定で使うプレイヤーID一覧は、試合開始時点でココで固定するダカラ。
     // 終了後にvsState.playersがポーリングで更新され続けてズレたりしても、コッチは影響受けないヨ
     vsState.matchPlayerIds = vsState.players.filter(p => p.role === 'player').map(p => p.id);
@@ -3788,10 +3798,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   // プレイヤーに「ゲーム終了ダカラ！」を即座に見せて、ボタンを押してもらうダカラ。
   // 両方が押す（か、15秒経つ）マデ結果画面ニは進まないヨ
   // （片方の画面だけ止まったまま、が起きないようにするための仕組みダカラ）
-  function vsShowMatchFinishedGate(){
-    if(vsState.finishGateShown) return;
-    vsState.finishGateShown = true;
-    vsState.finishDeadline = Date.now() + 15000;
+  //
+  // 設計方針：何度呼んでも安全な「ベキ等」な作りにするダカラ。
+  // vsState.myFinishAckedっていうローカルの一度キリのフラグ（trueになったら二度とfalseに戻らない）を
+  // 唯一の判定材料にして、呼ばれるたびソレを見て描画し直すダケにするヨ。
+  // 「クリックした瞬間だけDOMを直接書き換える」方式だと、後から別の理由でinnerHTMLが
+  // 上書きされた時に「押した記録」が消えて元のボタンに戻っちゃうリスクがあったカラ、コッチの方が頑丈ダヨ
+  function vsRenderMatchFinishedGate(){
+    if(vsState.myRole !== 'player') return;
     let overlay = document.getElementById('vs-finish-gate-overlay');
     if(!overlay){
       overlay = document.createElement('div');
@@ -3799,18 +3813,31 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       overlay.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:rgba(0,0,0,0.8); color:#fff; text-align:center; padding:24px; font-family:inherit;';
       document.body.appendChild(overlay);
     }
-    overlay.innerHTML =
-      '<div style="font-size:36px; font-weight:900;">🏁 ゲーム終了ダカラ！</div>' +
-      '<div id="vs-finish-gate-sub" style="font-size:14px; opacity:0.85;">結果を見る準備ができたら押してネ</div>' +
-      '<button class="primary" id="vs-finish-gate-btn">結果を見る</button>';
     overlay.style.display = 'flex';
-    document.getElementById('vs-finish-gate-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('vs-finish-gate-btn');
-      if(btn){ btn.disabled = true; btn.textContent = '相手を待ってるダカラ…'; }
-      const sub = document.getElementById('vs-finish-gate-sub');
-      if(sub) sub.textContent = '相手が結果を見る準備をするのを待ってるダカラ…';
-      await vsAckField('finishAcks', null);
-    }, { once: true });
+    if(vsState.myFinishAcked){
+      overlay.innerHTML =
+        '<div style="font-size:36px; font-weight:900;">🏁 ゲーム終了ダカラ！</div>' +
+        '<div style="font-size:14px; opacity:0.85;">相手が結果を見る準備をするのを待ってるダカラ…</div>' +
+        '<button class="primary" id="vs-finish-gate-btn" disabled>相手を待ってるダカラ…</button>';
+    } else {
+      overlay.innerHTML =
+        '<div style="font-size:36px; font-weight:900;">🏁 ゲーム終了ダカラ！</div>' +
+        '<div style="font-size:14px; opacity:0.85;">結果を見る準備ができたら押してネ</div>' +
+        '<button class="primary" id="vs-finish-gate-btn">結果を見る</button>';
+      document.getElementById('vs-finish-gate-btn').addEventListener('click', () => {
+        // 一度trueになったフラグは、コノ試合が終わるまで二度とfalseに戻さないダカラ
+        vsState.myFinishAcked = true;
+        vsRenderMatchFinishedGate();
+        vsAckField('finishAcks', null);
+      }, { once: true });
+    }
+  }
+
+  function vsShowMatchFinishedGate(){
+    if(vsState.finishGateShown) return;
+    vsState.finishGateShown = true;
+    vsState.finishDeadline = Date.now() + 15000;
+    vsRenderMatchFinishedGate();
   }
 
   // ゲーム終了ボタンを両方が押した（か、タイムアウトした）後、実際に結果画面へ切り替える処理ダカラ

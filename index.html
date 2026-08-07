@@ -590,7 +590,7 @@
 
     <div id="center-marker"><span class="cm-tr"></span><span class="cm-bl"></span></div>
 
-    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.38</div>
+    <div id="logo-reset" class="mono" title="クリックでタイトルに戻るヨ">v2.40</div>
 
     <div id="answer-panel">
       <span class="region-tag" id="panel-region"></span>
@@ -632,7 +632,7 @@
     <div id="overlay">
       <div id="overlay-brand">
         <span id="overlay-brand-title">世界の国名当てゲーム</span>
-        <span id="overlay-brand-version" class="mono">v2.38</span>
+        <span id="overlay-brand-version" class="mono">v2.40</span>
       </div>
       <h1>COUNTRY NAME QUIZ</h1>
       <div class="desc">
@@ -1796,7 +1796,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       return 'data:' + entry.mime + ';base64,' + entry.data;
     }
     const code = (props.cca2 || '').toLowerCase();
-    return code ? ('https://flagcdn.com/' + code + '.svg') : '';
+    return code ? ('https://flagcdn.com/w320/' + code + '.png') : '';
   }
   // 国旗の画像、たまに一過性の通信グリッチで読み込み失敗するコトがあるダカラ、
   // 失敗したら少し待ってから自動で読み直す保険をかけとくヨ（バッジ列・対戦結果画面、両方で使うヨ）。
@@ -1833,7 +1833,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
   function addSessionBadge(props){
     if(!sessionBadgeRow) return;
     const code = (props.cca2 || '').toLowerCase();
-    const url = state.quizType === 'capital' ? capitalBadgeUrl(props) : (code ? ('https://flagcdn.com/' + code + '.svg') : '');
+    const url = state.quizType === 'capital' ? capitalBadgeUrl(props) : (code ? ('https://flagcdn.com/w320/' + code + '.png') : '');
     if(!url) return;
     const name = state.quizType === 'capital'
       ? ((typeof CAPITAL_DATA !== 'undefined' && CAPITAL_DATA[props.name_ja]) ? CAPITAL_DATA[props.name_ja].name : props.name_ja)
@@ -2857,7 +2857,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
     function appendOne(feature){
       const props = feature.properties;
       const code = (props.cca2 || '').toLowerCase();
-      const url = state.quizType === 'capital' ? capitalBadgeUrl(props) : (code ? ('https://flagcdn.com/' + code + '.svg') : '');
+      const url = state.quizType === 'capital' ? capitalBadgeUrl(props) : (code ? ('https://flagcdn.com/w320/' + code + '.png') : '');
       if(!url) return;
       const name = state.quizType === 'capital'
         ? ((typeof CAPITAL_DATA !== 'undefined' && CAPITAL_DATA[props.name_ja]) ? CAPITAL_DATA[props.name_ja].name : props.name_ja)
@@ -3874,7 +3874,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const flagsEl = document.getElementById('vs-result-flags-' + entry.playerId);
       if(!flagsEl) return;
       const code = (entry.cca2 || '').toLowerCase();
-      const url = code ? ('https://flagcdn.com/' + code + '.svg') : '';
+      const url = code ? ('https://flagcdn.com/w320/' + code + '.png') : '';
       if(!url) return;
       const img = document.createElement('img');
       img.src = url;
@@ -4077,16 +4077,18 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const p = f.properties;
       const isCollected = !!col[p.cca2];
       const code = (p.cca2 || '').toLowerCase();
-      const svgUrl = code ? ('https://flagcdn.com/' + code + '.svg') : '';
+      const svgUrl = code ? ('https://flagcdn.com/w320/' + code + '.png') : '';
       const nameLabel = isCollected ? p.name_ja : '？？？';
       return '<div class="gallery-item' + (isCollected ? '' : ' locked') + '"' +
         (isCollected ? ' data-cca2="' + p.cca2 + '" data-flag-url="' + svgUrl + '" data-flag-name="' + p.name_ja + '"' : '') + '>' +
         (isCollected
-          ? '<img src="' + svgUrl + '" alt="' + p.name_ja + '" loading="lazy">'
+          ? '<img src="' + svgUrl + '" alt="' + p.name_ja + '">'
           : '<div class="locked-box"></div>') +
         '<div class="gallery-name">' + nameLabel + '</div>' +
         '</div>';
     }).join('');
+    // コッチの画像には今まで自動リトライが付いてなかったカラ、追加しとくヨ
+    grid.querySelectorAll('img').forEach(img => attachImgRetry(img, img.src));
   }
   document.getElementById('gallery-open-btn').addEventListener('click', () => {
     renderGallery();
@@ -4150,7 +4152,7 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       return '<div class="gallery-item' + (isCollected ? '' : ' locked') + '"' +
         (isCollected ? ' data-flag-url="' + badgeUrl + '" data-flag-name="' + capName + '" data-country="' + p.name_ja + '"' : '') + '>' +
         (isCollected
-          ? '<img class="' + emblemClass.trim() + '" src="' + badgeUrl + '" alt="' + capName + '" loading="lazy">'
+          ? '<img class="' + emblemClass.trim() + '" src="' + badgeUrl + '" alt="' + capName + '">'
           : '<div class="locked-box"></div>') +
         '<div class="gallery-name">' + nameLabel + '</div>' +
         '</div>';
@@ -4164,12 +4166,14 @@ const COUNTRY_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature
       const url = secretBadgeUrl(item);
       const emblemClass = item.kind === 'emblem' ? ' badge-emblem' : '';
       html += '<div class="gallery-item secret" data-flag-url="' + url + '" data-flag-name="' + item.label + '" data-country="' + item.sub + '">' +
-        '<img class="' + emblemClass.trim() + '" src="' + url + '" alt="' + item.label + '" loading="lazy">' +
+        '<img class="' + emblemClass.trim() + '" src="' + url + '" alt="' + item.label + '">' +
         '<div class="gallery-name">✨' + item.label + '</div>' +
         '</div>';
     });
 
     grid.innerHTML = html;
+    // コッチの画像にも今まで自動リトライが付いてなかったカラ、追加しとくヨ
+    grid.querySelectorAll('img').forEach(img => attachImgRetry(img, img.src));
   }
   document.getElementById('capital-gallery-open-btn').addEventListener('click', () => {
     renderCapitalGallery();
